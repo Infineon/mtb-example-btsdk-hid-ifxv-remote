@@ -1,0 +1,16 @@
+bt_spy.ini
+bt_spy.pro.user.*
+bt_spy.pro.user
+
+library-manager.log
+
+# recursively ignore build folders in the tree
+build/
+
+# recursively ignore all GeneratedSource folders contents
+GeneratedSource/
+
+__pycache__/
+
+# MT 3.0 mtbquery file, ignore
+.mtbqueryapi
