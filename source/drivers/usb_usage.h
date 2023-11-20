@@ -36,8 +36,8 @@
  * Keyscan Interface definitions
  *
  */
-#ifndef __USBUSAGE_KEY_H__
-#define __USBUSAGE_KEY_H__
+#ifndef USBUSAGE_KEY_H__
+#define USBUSAGE_KEY_H__
 
 /// KB USB usages
 enum UsbUsage
@@ -286,4 +286,4 @@ enum UsbUsage
     USB_USAGE_RIGHT_ALT=230,
     USB_USAGE_RIGHT_GUI=231
 };
-#endif // __USBUSAGE_H__
+#endif // USBUSAGE_H__

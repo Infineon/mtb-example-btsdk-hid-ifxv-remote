@@ -18,34 +18,16 @@
 # define WICED_BT_TRACE(format,...)   wiced_printf(NULL, 0, (format"\n"), ##__VA_ARGS__)
 #endif
 
-#define MAX_CONN            2
+#define DEFERRED_LINK_PARAM_UPDATE_TIME 20  // differ link parameter update for 20 sec after link is up
 
 /******************************************************************************
- *  typedef
+ *  local data
  ******************************************************************************/
-typedef struct
-{
-    wiced_bt_gatt_connection_status_t   connection_status;
-    uint16_t                            acl_conn_handle;
-    wiced_bt_device_address_t           bd_addr;                    // Remote device address (from connection_status)
-    wiced_bt_ble_conn_params_t          conn_params;
 
-    uint8_t                             transport:2;                // 0:no link (BT_TRANSPORT_NONE), 1:Classic (BT_TRANSPORT_BR_EDR) , 2:LE (BT_TRANSPORT_LE)
-    uint8_t                             encrypted:1;                // encrypted:1, not encrypted:0
-    uint8_t                             link_parameter_updated:1;   // 1:connection parameter update, 0: no connection parameter update since connection
-    uint8_t                             indicate_pending:1;         // 1:waiting for indication confirm, 0:no indication pending
-    uint8_t                             bonded:1;                   // 1:bonded, 0:not bonded
-} link_state_t;
-
-/******************************************************************************
- *  local variables
- ******************************************************************************/
-static struct
-{
-    link_state_t   conn[MAX_CONN];
-    link_state_t * active;
-
-} link = {0};
+link_t link = {0};
+#ifdef SKIP_CONNECT_PARAM_UPDATE_EVEN_IF_NO_PREFERED
+static wiced_timer_t  deferred_link_update_timer;
+#endif
 
 /******************************************************************************
  *  Private functions
@@ -70,6 +52,35 @@ static link_state_t * link_get_state(uint16_t conn_id)
     }
     return NULL;
 }
+
+#ifdef ASSYM_PERIPHERAL_LATENCY
+/////////////////////////////////////////////////////////////////////////////////
+/// request asymmetric peripheral latency.
+/// this is useful when central doesn't accept the connection parameter update req
+/// peripheral can enable asymmetric peripheral latency to lower power consumption
+/////////////////////////////////////////////////////////////////////////////////
+static void link_set_peripheral_latency(uint16_t peripheralLatencyinmS)
+{
+    UINT16 latency_plus_one = peripheralLatencyinmS/wiced_blehidd_get_connection_interval() * 4/5;
+
+    wiced_bt_cfg_settings.ble_scan_cfg.conn_latency = latency_plus_one - 1;
+    wiced_bt_cfg_settings.ble_scan_cfg.conn_min_interval =
+    wiced_bt_cfg_settings.ble_scan_cfg.conn_max_interval = wiced_blehidd_get_connection_interval();
+
+    WICED_BT_TRACE("\nhidd_blelink_set_peripheral_latency: interval=%d, peripherallatency=%d",
+               wiced_bt_cfg_settings.ble_scan_cfg.conn_min_interval,
+               wiced_bt_cfg_settings.ble_scan_cfg.conn_latency);
+    wiced_blehidd_set_asym_peripheral_latency( wiced_blehidd_get_connection_handle(), wiced_bt_cfg_settings.ble_scan_cfg.conn_latency );
+}
+#endif // ASSYM_PERIPHERAL_LATENCY
+
+#ifdef SKIP_CONNECT_PARAM_UPDATE_EVEN_IF_NO_PREFERED
+static void deferred_link_param_update_timer_cb( TIMER_PARAM_TYPE arg )
+{
+    WICED_BT_TRACE("Update link parameter");
+    link_check_conn_parameter();
+}
+#endif
 
 /******************************************************************************
  *  Public functions
@@ -165,6 +176,75 @@ void link_set_parameter_updated(wiced_bool_t set)
 }
 
 /*******************************************************************************
+ * Function Name: link_check_conn_parameter
+ ********************************************************************************
+ * Summary:
+ *    This function checks for current link parameter. If it is not within perfered configration
+ *    setting, it will request new link parameter based on the configuration settings.
+ *
+ * Parameters:
+ *    none
+ *
+ * Return:
+ *    none
+ *
+ *******************************************************************************/
+void link_check_conn_parameter()
+{
+    if ((link_get_acl_conn_param()->conn_interval < wiced_bt_cfg_settings.ble_scan_cfg.conn_min_interval) ||
+        (link_get_acl_conn_param()->conn_interval > wiced_bt_cfg_settings.ble_scan_cfg.conn_max_interval) ||
+        (link_get_acl_conn_param()->conn_latency != wiced_bt_cfg_settings.ble_scan_cfg.conn_latency))
+    {
+#ifdef ASSYM_PERIPHERAL_LATENCY
+        // If actual peripheral latency is smaller than desired peripheral latency, set asymmetric peripheral latency in the peripheral side
+        if ((wiced_blehidd_get_connection_interval() * (wiced_blehidd_get_peripheral_latency() + 1)) <
+            (wiced_bt_cfg_settings.ble_scan_cfg.conn_min_interval * ( wiced_bt_cfg_settings.ble_scan_cfg.conn_latency + 1)))
+        {
+            link_set_peripheral_latency( wiced_bt_cfg_settings.ble_scan_cfg.conn_min_interval * (wiced_bt_cfg_settings.ble_scan_cfg.conn_latency+1) * 5 / 4 );
+        }
+#else
+        link_set_acl_conn_interval(wiced_bt_cfg_settings.ble_scan_cfg.conn_min_interval,
+                                   wiced_bt_cfg_settings.ble_scan_cfg.conn_max_interval,
+                                   wiced_bt_cfg_settings.ble_scan_cfg.conn_latency,
+                                   wiced_bt_cfg_settings.ble_scan_cfg.conn_supervision_timeout);
+        link_set_parameter_updated(FALSE);
+#endif
+    }
+}
+
+/*******************************************************************************
+ * Function Name: link_conn_update_complete
+ ********************************************************************************
+ * Summary:
+ *    This function is called on Link parameter update complete event
+ *
+ * Parameters:
+ *    p_data       -- pointer to event data
+ *
+ * Return:
+ *    none
+ *
+ *******************************************************************************/
+void link_conn_update_complete(wiced_bt_ble_connection_param_update_t * p_data)
+{
+    link_get_acl_conn_param()->conn_interval = p_data->conn_interval,
+    link_get_acl_conn_param()->conn_latency = p_data->conn_latency,
+    link_get_acl_conn_param()->supervision_timeout = p_data->supervision_timeout;
+    link_set_parameter_updated(TRUE);
+
+#ifdef OTA_FIRMWARE_UPGRADE
+    if (ota_fw_upgrade_initialized)
+    {
+        return;
+    }
+#endif
+
+#ifndef  SKIP_CONNECT_PARAM_UPDATE_EVEN_IF_NO_PREFERED
+    link_check_conn_parameter();
+#endif
+}
+
+/*******************************************************************************
  * Function Name: link_is_parameter_updated
  ********************************************************************************
  * Summary:
@@ -254,6 +334,8 @@ wiced_bt_gatt_status_t link_up( wiced_bt_gatt_connection_status_t * p_status )
 {
     link_state_t * new_conn = NULL;
 
+    WICED_BT_TRACE("Link up, conn_id:%04x peer_addr:%B type:%d", p_status->conn_id, p_status->bd_addr, p_status->addr_type);
+
     // find the empty slot
     for (uint8_t idx=0; idx < MAX_CONN; idx++)
     {
@@ -281,17 +363,44 @@ wiced_bt_gatt_status_t link_up( wiced_bt_gatt_connection_status_t * p_status )
     new_conn->transport = BT_TRANSPORT_LE;
     new_conn->acl_conn_handle = wiced_bt_dev_get_acl_conn_handle(new_conn->bd_addr, BT_TRANSPORT_LE);
 
-    //configure ATT MTU size with peer device
-    WICED_BT_TRACE("Configure MTU with size %d",  ENCODE_BUF_SIZE+5);
-    wiced_bt_gatt_configure_mtu(link_conn_id(), ENCODE_BUF_SIZE+5);
+    // Stop adv
+    bt_stop_advertisement();
 
-    wiced_bt_l2cap_enable_update_ble_conn_params (new_conn->bd_addr, TRUE);
+    // Link is up, start the link idling timer
+//    hidd_le_link_restart_idle_timer();
+
+    sds_link_up();
 
     // if this is a known host, we restore the cccd flags from NVRAM; otherwise, clear all flags */
     host_restore_cccd_flags(new_conn->bd_addr);
 
+    // allow link parameter update
+    wiced_bt_l2cap_enable_update_ble_conn_params (new_conn->bd_addr, TRUE);
+
+    // if dev does not agree with our setting, we change both to bonded
+    if (wiced_blehidd_is_device_bonded() ^ link_is_bonded())
+    {
+        if (link_is_bonded())
+        {
+            // this is bonded device, we have the bonding info..
+            WICED_BT_TRACE("Set device bonded flag");
+            wiced_blehidd_set_device_bonded_flag(WICED_TRUE);
+        }
+        else
+        {
+            // already bonded in dev, we update our record
+            WICED_BT_TRACE("Update bonded flag");
+            link_set_bonded(WICED_TRUE);
+        }
+    }
+
     // notify application the link is up
     app_link_up(p_status);
+
+#ifdef SKIP_CONNECT_PARAM_UPDATE_EVEN_IF_NO_PREFERED
+    WICED_BT_TRACE("Defer link parameter update for %d second", DEFERRED_LINK_PARAM_UPDATE_TIME);
+    wiced_start_timer(&link.deferred_link_update_timer, DEFERRED_LINK_PARAM_UPDATE_TIME);
+#endif
 
     return WICED_BT_GATT_SUCCESS;
 }
@@ -305,6 +414,8 @@ wiced_bt_gatt_status_t link_up( wiced_bt_gatt_connection_status_t * p_status )
 wiced_bt_gatt_status_t link_down( wiced_bt_gatt_connection_status_t *p_status )
 {
     link_state_t * conn = link_get_state(p_status->conn_id);
+
+    WICED_BT_TRACE("Link down, id:0x%04x reason: %d (0x%02x)",  p_status->conn_id, p_status->reason, p_status->reason);
 
     if (conn == NULL)
     {
@@ -395,6 +506,68 @@ wiced_bt_ble_conn_params_t * link_get_acl_conn_param()
     }
     // avoid return NULL
     return &link.conn[0].conn_params;
+}
+
+/********************************************************************************
+ * Function Name: UINT8 link_params_update_is_expected()
+ ********************************************************************************
+ * Summary: Check the le parameters is updated to expected setting or not
+ *
+ * Parameters:
+ *  none
+ *
+ * Return:
+ *  FALSE : not expected configuration le parameters
+ *  TRUE  : expected configuration le parameters
+ *
+ *******************************************************************************/
+wiced_bool_t link_params_update_is_expected(void)
+{
+    wiced_bool_t ret = TRUE;
+
+    if ((wiced_blehidd_get_connection_interval() < wiced_bt_cfg_settings.ble_scan_cfg.conn_min_interval) ||
+        (wiced_blehidd_get_connection_interval() > wiced_bt_cfg_settings.ble_scan_cfg.conn_max_interval) ||
+        (wiced_blehidd_get_peripheral_latency() != wiced_bt_cfg_settings.ble_scan_cfg.conn_latency))
+    {
+        ret = FALSE;
+    }
+
+    return ret;
+}
+
+/********************************************************************************
+ * Function Name: UINT8 link_pairing_complete()
+ ********************************************************************************
+ * Summary: This function is called on pairing complete event
+ *
+ * Parameters:
+ *  addr - bd address
+ *  pairing_info - pairing information
+ *
+ * Return:
+ *
+ *******************************************************************************/
+void link_pairing_complete( BD_ADDR addr, wiced_bt_dev_ble_pairing_info_t * p_info )
+{
+    if (link.active)
+    {
+        memcpy(&(link.active->pairing_info), p_info, sizeof(wiced_bt_dev_ble_pairing_info_t));
+
+        link_set_bonded(TRUE); // Now we are bonded
+        if (!wiced_blehidd_is_device_bonded())
+        {
+            WICED_BT_TRACE("set device bonded flag");
+            wiced_blehidd_set_device_bonded_flag(WICED_TRUE);
+        }
+        hci_control_send_pairing_complete_evt( p_info->reason, addr, BT_TRANSPORT_LE );
+    }
+}
+
+void link_init()
+{
+#ifdef SKIP_CONNECT_PARAM_UPDATE_EVEN_IF_NO_PREFERED
+    wiced_init_timer( &link.deferred_link_update_timer, deferred_link_param_update_timer_cb, 0, WICED_SECONDS_TIMER );
+#endif
 }
 
 /* end of file */

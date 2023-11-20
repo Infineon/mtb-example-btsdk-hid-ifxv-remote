@@ -34,7 +34,8 @@
 /** @file
  *
  */
-#pragma once
+#ifndef IFXV_OPUS_CODEC_H__
+#define IFXV_OPUS_CODEC_H__
 
 #include "ifxv_opus.h"
 
@@ -45,3 +46,5 @@
 #define codec_init()                    ifxv_opus_init()
 #define codec_encode(pcm, cnt, frame)   ifxv_opus_encode(pcm, cnt, frame)
 #define codec_decode(frame, cnt, pcm)   ifxv_opus_decode(frame, cnt, pcm)
+
+#endif // IFXV_OPUS_CODEC_H__

@@ -30,7 +30,8 @@
  * of such system or application assumes all risk of such use and in doing
  * so agrees to indemnify Cypress against all liability.
  */
-#pragma once
+#ifndef BT_V1_H__
+#define BT_V1_H__
 
 /******************************************************************************
  * macro defines
@@ -50,3 +51,5 @@
  * functions
  ******************************************************************************/
 wiced_result_t bt_v_init(wiced_bt_management_cback_t * hidd_bt_management_ptr);
+
+#endif // BT_V1_H__

@@ -39,8 +39,8 @@
  * device
  *
  */
-#ifndef __AUDIO_PROTOCOL_H__
-#define __AUDIO_PROTOCOL_H__
+#ifndef AUDIO_PROTOCOL_H__
+#define AUDIO_PROTOCOL_H__
 
 #include "ifx_voice.h"
 
@@ -56,4 +56,4 @@
 #define protocol_write_handler(i, d)    ifxv_gatts_req_write_callback(i, d)
 #define protocol_init()                 ifxv_init()
 
-#endif // __AUDIO_PROTOCOL_H__
+#endif // AUDIO_PROTOCOL_H__

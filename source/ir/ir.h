@@ -30,36 +30,32 @@
  * of such system or application assumes all risk of such use and in doing
  * so agrees to indemnify Cypress against all liability.
  */
-#ifndef APP_BTSTACK_V1_H__
-#define APP_BTSTACK_V1_H__
 
-#include "wiced_bt_types.h"
-#include "cycfg_bt_settings.h"
-#include "wiced_hidd_lib.h"
+/** @file
+ *
+ * This file defines the interface of Infrared (IR) Transmit feature
+ *
+ */
+#ifndef IR_H__
+#define IR_H__
 
-#define MAX_MTU_SIZE                     251
+#define IR_TX_GPIO           WICED_P38
+//#define IR_TX_GPIO           WICED_P15 // P38 not available on 62-pin package
 
-#define WICED_TIMER_PARAM_TYPE TIMER_PARAM_TYPE
-
-#ifdef WICED_EVAL
- #define RED_LED        WICED_PLATFORM_LED_2
- #define LINK_LED       WICED_PLATFORM_LED_1
+#ifdef SUPPORT_IR
+ #include "wiced.h"
+ #include "wiced_irtx.h"
+ void ir_init(BYTE gpio);
+ void ir_start(uint8_t code, uint8_t repeat_count);
+ void ir_stop();
+ wiced_bool_t ir_button(uint8_t key, wiced_bool_t down);
+ #define ir_is_active() (!wiced_irtx_isAvailable())
 #else
- #ifdef RED_LED
-  #undef RED_LED
- #endif
- #define RED_LED        WICED_PLATFORM_LED_1
- #define LINK_LED       WICED_PLATFORM_LED_2
-#endif
+ #define ir_init(gpio)
+ #define ir_start(code, repeat)
+ #define ir_stop()
+ #define ir_button(key, down) FALSE
+ #define ir_is_active() FALSE
+#endif //SUPPORT_IR
 
-#define cfg_sec_mask() ( wiced_bt_cfg_settings.security_requirement_mask )
-
-#define WICED_BTSTACK_VERSION_MAJOR WICED_SDK_MAJOR_VER
-#define WICED_BTSTACK_VERSION_MINOR WICED_SDK_MINOR_VER
-#define WICED_BTSTACK_VERSION_PATCH WICED_SDK_BUILD_NUMBER
-
-void hidd_enable_interrupt(wiced_bool_t en);
-
-wiced_bt_gatt_status_t app_gatt_read_req_handler( uint16_t conn_id, wiced_bt_gatt_read_t * p_read_data );
-
-#endif // APP_BTSTACK_V1_H__
+#endif // IR_H__

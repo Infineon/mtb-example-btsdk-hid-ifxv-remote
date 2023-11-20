@@ -43,22 +43,6 @@
  #define SFI_DEEP_SLEEP 0
 #endif
 
-#if SFI_DEEP_SLEEP
- extern uint8_t pmu_attemptSleepState;
- extern void sfi_enter_deep_power_down(void);
- extern void sfi_exit_deep_power_down(BOOL8 forceExitDeepPowerDown);
- extern void sfi_allow_deep_sleep(void);
- #define hidd_nvram_allow_deep_sleep() sfi_allow_deep_sleep();
- #define hidd_nvram_enter_deep_sleep() sfi_enter_deep_power_down()
- #define hidd_nvram_exit_deep_sleep() sfi_exit_deep_power_down(TRUE)
- #define hidd_nvram_deep_sleep() {sfi_allow_deep_sleep(); sfi_enter_deep_power_down();}
-#else
- #define hidd_nvram_allow_deep_sleep()
- #define hidd_nvram_enter_deep_sleep()
- #define hidd_nvram_exit_deep_sleep()
- #define hidd_nvram_deep_sleep()
-#endif
-
 /** Reads the data from NVRAM
  *
  * @param[in]  vs_id       : Volatile Section Identifier. Application can use
@@ -76,7 +60,7 @@ wiced_bool_t nvram_read( uint16_t vs_id, uint8_t * p_data, uint16_t data_length)
     wiced_result_t status;
 
     wiced_hal_read_nvram(vs_id, data_length, p_data, &status);
-    hidd_nvram_deep_sleep();
+    nvram_deep_sleep();
     return status == WICED_BT_SUCCESS;
 }
 
@@ -99,6 +83,6 @@ wiced_bool_t nvram_write( uint16_t vs_id, uint8_t * p_data, uint16_t data_length
     wiced_result_t status;
 
     wiced_hal_write_nvram(vs_id, data_length, p_data, &status);
-    hidd_nvram_deep_sleep();
+    nvram_deep_sleep();
     return status == WICED_BT_SUCCESS;
 }

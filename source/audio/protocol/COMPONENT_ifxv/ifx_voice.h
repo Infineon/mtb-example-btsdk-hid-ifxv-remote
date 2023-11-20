@@ -39,8 +39,8 @@
  * device
  *
  */
-#ifndef __IFX_VOICE_H__
-#define __IFX_VOICE_H__
+#ifndef IFX_VOICE_H__
+#define IFX_VOICE_H__
 
 // sample rate defines
 #define IFX_AUDIO_CFG_SAMPLE_RATE_8K  HIDD_CODEC_SAMP_FREQ_8K
@@ -56,4 +56,4 @@ wiced_bt_gatt_status_t ifxv_gatts_req_write_callback(uint16_t conn_id, wiced_bt_
 uint16_t ifxv_audio_data_max_size();
 void ifxv_set_sampling_rate(sample_freq_t sampling_rate);
 
-#endif // __IFX_VOICE_H__
+#endif // IFX_VOICE_H__

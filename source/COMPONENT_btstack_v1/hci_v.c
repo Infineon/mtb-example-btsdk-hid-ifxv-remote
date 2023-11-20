@@ -38,7 +38,6 @@
  */
 #if defined(TESTING_USING_HCI)
 
-//#include "wiced_bt_dev.h"
 #include "wiced_transport.h"
 #include "hci.h"
 

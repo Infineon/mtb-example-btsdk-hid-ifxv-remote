@@ -103,6 +103,7 @@ static void hci_timer_cb( TIMER_PARAM_TYPE arg )
         hci_control_send_audio_data_req();
     }
 }
+
 /*
  *  send audio data request event
  *
@@ -239,7 +240,7 @@ void hci_control_send_paired_host_info()
 {
     uint8_t   tx_buf[(BD_ADDR_LEN+1)*HIDD_HOST_LIST_MAX+1];
     uint8_t   len = host_get_info(tx_buf);
-    APP_HCI_TRACE("Send host info, count = %d", tx_buf[0]);
+    APP_HCI_TRACE("Send host info, len=%d count = %d", len, tx_buf[0] & 0x7f); // mask out bit 7 of tx_buf[0] that contains link up/down status
     hci_control_send_data( HCI_CONTROL_HIDD_EVENT_HOST_ADDR, tx_buf, len );
 }
 
@@ -326,23 +327,19 @@ void hci_control_key(uint8_t * p_data, uint32_t data_len)
 /******************************************************************************************/
 void hci_control_send_report( uint8_t channel, uint8_t type, uint8_t *p_data, uint16_t length )
 {
-    wiced_bool_t OK_to_send = WICED_FALSE;
-
     APP_HCI_TRACE("cci_send_report ch:%d type:%d len:%d", channel, type, length);
 
     //send report only when link is connected
     if(link_is_connected())
     {
-        if(cfg_sec_mask())
+        if (!cfg_sec_mask() || link_is_encrypted())
         {
-            if (link_is_encrypted())
-            {
-                OK_to_send = WICED_TRUE;
-            }
+            uint8_t rpt_id = *p_data++;
+            hidd_send_data(rpt_id, type, p_data, --length);
         }
         else
         {
-            OK_to_send = WICED_TRUE;
+            WICED_BT_TRACE("Link is not encrypted");
         }
     }
     else //enter discoverable/reconnecting
@@ -350,118 +347,110 @@ void hci_control_send_report( uint8_t channel, uint8_t type, uint8_t *p_data, ui
         APP_HCI_TRACE("not connected, trying to reconnect...", channel, type, length);
         bt_enter_connect();
     }
-
-    if ( OK_to_send )
-    {
-        APP_HCI_TRACE("Sending report...", channel, type, length);
-        uint8_t rpt_id = *p_data++;
-        hidd_send_data(rpt_id, type, p_data, --length);
-    }
 }
 
 /******************************************************************************************/
 /******************************************************************************************/
 void hci_hidd_handle_command( uint16_t cmd_opcode, uint8_t * p_data, uint32_t data_len )
 {
-    uint8_t bytes_written;
-
-    APP_HCI_TRACE("Cmd:%04X", cmd_opcode);
-
     switch( cmd_opcode )
     {
     case HCI_CONTROL_COMMAND_RESET:
-        APP_HCI_TRACE("Reset");
+        APP_HCI_TRACE("Cmd:%04X -- Reset", cmd_opcode);
         hci_hidd_dev_handle_reset_cmd( );
         break;
 
     case HCI_CONTROL_COMMAND_TRACE_ENABLE:
-        APP_HCI_TRACE("Trace %d %d", *p_data, *(p_data+1));
+        APP_HCI_TRACE("Cmd:%04X -- Trace %d %d", cmd_opcode, *p_data, *(p_data+1));
         hci_control_handle_trace_enable( p_data );
         break;
 
     case HCI_CONTROL_COMMAND_SET_LOCAL_BDA:
-        APP_HCI_TRACE("Set address %B", p_data);
+        APP_HCI_TRACE("Cmd:%04X -- Set address %B", cmd_opcode, p_data);
         hci_hidd_dev_handle_set_local_bda( p_data );
         break;
 
     case HCI_CONTROL_HIDD_COMMAND_ACCEPT_PAIRING:
         if ( bt_is_advertising())
         {
-            APP_HCI_TRACE("stop adverting");
+            APP_HCI_TRACE("Cmd:%04X -- stop advertising", cmd_opcode);
             bt_stop_advertisement();
         }
         else
         {
-            APP_HCI_TRACE("pairing");
+            APP_HCI_TRACE("Cmd:%04X -- pairing", cmd_opcode);
             bt_enter_pairing();
         }
         break;
 
     case HCI_CONTROL_HIDD_COMMAND_HID_HOST_ADDR:  // reqesting for host paired host address
-        APP_HCI_TRACE("Host info req.");
+        APP_HCI_TRACE("Cmd:%04X -- Host info req.", cmd_opcode);
         hci_control_send_paired_host_info();
         hci_control_send_state_change(BT_TRANSPORT_LE, link_is_connected() ? HID_LINK_CONNECTED :  HID_LINK_DISCONNECTED);
         hci_control_send_advertisement_state_evt( bt_get_advertising_mode() );
         break;
 
     case HCI_CONTROL_HIDD_COMMAND_CONNECT:
-        APP_HCI_TRACE("Connect");
+        // We check for link state just in case if Client Control is sending wrong command at wrong state
         if (link_is_connected())
         {
-            APP_HCI_TRACE("Already connected, disconnecting instead...");
+            APP_HCI_TRACE("Cmd:%04X -- Connect: Already connected, disconnecting instead...", cmd_opcode);
             bt_disconnect();
         }
         else
         {
+            APP_HCI_TRACE("Cmd:%04X -- Connect", cmd_opcode);
             bt_enter_connect();
         }
         break;
 
     case HCI_CONTROL_HIDD_COMMAND_DISCONNECT:
-        APP_HCI_TRACE("Disconnect");
+        // We check for link state just in case if Client Control is sending wrong command at wrong state
         if (link_is_connected())
         {
+            APP_HCI_TRACE("Cmd:%04X -- Disconnect", cmd_opcode);
             bt_disconnect();
         }
         else
         {
-            APP_HCI_TRACE(" Already disconnected, connecting instead...");
+            APP_HCI_TRACE("Cmd:%04X -- Disconnect: Already disconnected, connecting instead...", cmd_opcode);
             bt_enter_connect();
         }
         break;
 
     case HCI_CONTROL_COMMAND_DELETE_NVRAM_DATA:
     case HCI_CONTROL_HIDD_COMMAND_VIRTUAL_UNPLUG:
-        APP_HCI_TRACE("Remove pairing");
+        APP_HCI_TRACE("Cmd:%04X -- Remove pairing", cmd_opcode);
         app_remove_host_bonding();
         led_blink_stop(LINK_LED);
         led_off(LINK_LED);
         break;
 
     case HCI_CONTROL_HIDD_COMMAND_SEND_REPORT:
-        APP_HCI_TRACE("Send Report: %A", p_data, data_len);
+        APP_HCI_TRACE("Cmd:%04X -- Send Report: %A", cmd_opcode, p_data, data_len);
         hci_control_send_report(p_data[0], p_data[1], &p_data[2], (uint16_t)( data_len - 2 ));
         break;
 
     case HCI_CONTROL_MISC_COMMAND_GET_VERSION:
-        APP_HCI_TRACE("Get Version");
+        APP_HCI_TRACE("Cmd:%04X -- Get Version", cmd_opcode);
         hci_control_misc_handle_get_version();
         break;
 
     case HCI_CONTROL_HIDD_COMMAND_KEY:
-        APP_HCI_TRACE("key 0x%x %d",p_data[0], p_data[1]);
+        APP_HCI_TRACE("Cmd:%04X -- key %d %d", cmd_opcode, p_data[0], p_data[1]);
         hci_control_key(p_data, data_len);
         break;
 
-#if defined SUPPORT_AUDIO && defined BT_CONFIGURATOR_SUPPORT
+#if defined SUPPORT_AUDIO
     case HCI_CONTROL_HIDD_COMMAND_AUDIO_START_REQ:
-        APP_HCI_TRACE("HCI_CONTROL_HIDD_COMMAND_AUDIO_START_REQ: %A",p_data, data_len);
+        APP_HCI_TRACE("Cmd:%04X -- HCI_CONTROL_HIDD_COMMAND_AUDIO_START_REQ: %A",cmd_opcode, p_data, data_len);
         audio_set_routing_from_hci(TRUE, data_len > 1 ? p_data[1] : 0);
         hci.buffer_cnt = hci.req_cnt = 0;
         audio_start_request();
         break;
 
     case HCI_CONTROL_HIDD_COMMAND_AUDIO_STOP_REQ:
+        APP_HCI_TRACE("Cmd:%04X -- HCI_CONTROL_HIDD_COMMAND_AUDIO_START_REQ: %A",cmd_opcode, p_data, data_len);
         audio_stop_request();
         audio_set_routing_from_hci(FALSE, FALSE);
         break;
@@ -483,7 +472,7 @@ void hci_hidd_handle_command( uint16_t cmd_opcode, uint8_t * p_data, uint32_t da
         break;
 
     case HCI_CONTROL_HIDD_COMMAND_AUDIO_MIC_START_STOP:
-        APP_HCI_TRACE("HCI_CONTROL_HIDD_COMMAND_AUDIO_MIC_START_STOP: %A",p_data, data_len);
+        APP_HCI_TRACE("Cmd:%04X -- HCI_CONTROL_HIDD_COMMAND_AUDIO_MIC_START_STOP: %A",cmd_opcode, p_data, data_len);
         // if we have sample rate parameter
         if (data_len > 1)
         {
@@ -504,7 +493,7 @@ void hci_hidd_handle_command( uint16_t cmd_opcode, uint8_t * p_data, uint32_t da
         break;
 #endif
     default:
-        APP_HCI_TRACE("Ignored");
+        APP_HCI_TRACE("Cmd:%04X not Handled",cmd_opcode );
         break;
     }
 }
@@ -594,12 +583,15 @@ void hci_control_send_pairing_complete_evt( uint8_t result, uint8_t *p_bda, uint
 {
     uint8_t tx_buf[12];
     uint8_t *p = tx_buf;
-    int i;
 
     *p++ = result;
 
-    for ( i = 0; i < 6; i++ )
-        *p++ = p_bda[5 - i];
+    WICED_BT_TRACE("hci_control_send_pairing_complete_evt: result:%d, bda=%B, type=%d", result, p_bda, type);
+
+    for (int i = 0; i < BD_ADDR_LEN; i++ )
+    {
+        *p++ = p_bda[BD_ADDR_LEN - 1 - i];
+    }
 
     *p++ = type;
 

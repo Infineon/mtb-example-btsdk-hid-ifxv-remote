@@ -44,20 +44,29 @@
 # define WICED_BT_TRACE(format,...)   wiced_printf(NULL, 0, (format"\n"), ##__VA_ARGS__)
 #endif
 
-#if GATT_TRACE==1
+#define APP_GATT_TRACE0        WICED_BT_TRACE
+#if GATT_TRACE
 # define APP_GATT_TRACE        WICED_BT_TRACE
-# define APP_GATT_TRACE2(...)
-#elif GATT_TRACE>1
-# define APP_GATT_TRACE        WICED_BT_TRACE
-# define APP_GATT_TRACE2       WICED_BT_TRACE
+# if GATT_TRACE>1
+#  define APP_GATT_TRACE2      WICED_BT_TRACE
+#  if GATT_TRACE>2
+#   define APP_GATT_TRACE3     WICED_BT_TRACE
+#  else
+#   define APP_GATT_TRACE3(...)
+#  endif
+# else
+#  define APP_GATT_TRACE2(...)
+#  define APP_GATT_TRACE3(...)
+# endif
 #else
 # define APP_GATT_TRACE(...)
 # define APP_GATT_TRACE2(...)
+# define APP_GATT_TRACE3(...)
 #endif
 
 wiced_bt_gatt_status_t gatt_v_callback( wiced_bt_gatt_evt_t event, wiced_bt_gatt_event_data_t * p_data)
 {
-    APP_GATT_TRACE("gatts_callback: unhandled event!!!:0x%x", event);
+    APP_GATT_TRACE("GATT: unhandled event %d !!!", event);
     return WICED_BT_GATT_SUCCESS;
 }
 
@@ -71,7 +80,7 @@ wiced_bt_gatt_status_t gatt_req_read_default_handler( uint16_t conn_id, wiced_bt
     uint16_t attr_len_to_copy;
     uint8_t *attr_val_ptr = NULL;
 
-    APP_GATT_TRACE2("In gatt_req_read_default_handler");
+    APP_GATT_TRACE3("In gatt_req_read_default_handler");
     if(!p_read_data)
     {
         return WICED_BT_GATT_ERROR;
@@ -80,14 +89,14 @@ wiced_bt_gatt_status_t gatt_req_read_default_handler( uint16_t conn_id, wiced_bt
     // default to invalid handle
     result = WICED_BT_GATT_INVALID_HANDLE;
 
-    APP_GATT_TRACE("gatt_req_read_default_handler, conn %d hdl 0x%x", conn_id, p_read_data->handle );
+    APP_GATT_TRACE3("GATT Read - conn %d hdl 0x%x", conn_id, p_read_data->handle );
 
     p_attribute = hidd_get_attribute(p_read_data->handle);
     if(p_attribute)
     {
         uint16_t mtu;
 
-        APP_GATT_TRACE2("Found handle hdl 0x%x", p_read_data->handle );
+        APP_GATT_TRACE3("Found handle hdl 0x%x", p_read_data->handle );
         //check if this is read request is for a long attribute value, if so take care of the offset as well
         if(p_read_data->is_long)
         {
@@ -107,7 +116,7 @@ wiced_bt_gatt_status_t gatt_req_read_default_handler( uint16_t conn_id, wiced_bt
             attr_len_to_copy = p_attribute->max_len;
         }
 
-        APP_GATT_TRACE2("attr_len_to_copy: %d offset: %d", attr_len_to_copy, p_read_data->offset);
+        APP_GATT_TRACE3("attr_len_to_copy: %d offset: %d", attr_len_to_copy, p_read_data->offset);
 
         if(attr_len_to_copy<*p_read_data->p_val_len)
         {
@@ -116,22 +125,27 @@ wiced_bt_gatt_status_t gatt_req_read_default_handler( uint16_t conn_id, wiced_bt
         }
 
         mtu = wiced_blehidd_get_att_mtu_size(host_addr());
-        APP_GATT_TRACE2("attr_len_to_copy: %d offset: %d, mtu is %d", attr_len_to_copy, p_read_data->offset, mtu);
+        APP_GATT_TRACE3("attr_len_to_copy: %d offset: %d, mtu is %d", attr_len_to_copy, p_read_data->offset, mtu);
 
         //make sure copying buff is large enough so it won't corrupt memory
         if(attr_len_to_copy >= mtu)
         {
-            APP_GATT_TRACE2("size(%d) > mtu(%d)", attr_len_to_copy, mtu);
+            APP_GATT_TRACE3("size(%d) > mtu(%d)", attr_len_to_copy, mtu);
             attr_len_to_copy = mtu - 1;
         }
+        APP_GATT_TRACE3("attr_len_to_copy: %d offset: %d", attr_len_to_copy, p_read_data->offset);
 
         // copy over the value to the supplied buffer(entirely if it fits, data worth of MTU size)
         // if we have only sent partial value of an attribute we expect the peer to issue a read blob request to get the
         // rest of the attribute value.
         memcpy( p_read_data->p_val, attr_val_ptr, attr_len_to_copy );
-        APP_GATT_TRACE2("Sending %d bytes from offset %d for attrib handle 0x%04x", attr_len_to_copy, p_read_data->offset, p_read_data->handle);
+        APP_GATT_TRACE("GATT Read - handle 0x%04x, len=%d, offset=%d -- %A", p_read_data->handle, attr_len_to_copy, p_read_data->offset, attr_val_ptr, attr_len_to_copy);
 
         result = WICED_BT_GATT_SUCCESS;
+    }
+    else
+    {
+        WICED_BT_TRACE("GATT Read - attribute not found, handle: %0x", p_read_data->handle);
     }
     return result;
 }
@@ -143,31 +157,33 @@ wiced_bt_gatt_status_t gatt_req_cb( wiced_bt_gatt_attribute_request_t *p_data )
 {
     wiced_bt_gatt_status_t result = WICED_BT_GATT_SUCCESS;
 
-//    WICED_BT_TRACE("gatt_req_cb conn %d, type %d", p_data->conn_id, p_data->request_type );
     switch ( p_data->request_type )
     {
         case GATTS_REQ_TYPE_READ:
-            APP_GATT_TRACE2("GATTS_REQ_TYPE_READ");
+            APP_GATT_TRACE2("Req READ handle:%04x len:%d ", p_data->data.read_req.handle, *p_data->data.read_req.p_val_len);
             result = app_gatt_read_req_handler(p_data->conn_id, &(p_data->data.read_req));
             break;
 
         case GATTS_REQ_TYPE_WRITE:
         case GATTS_REQ_TYPE_PREP_WRITE:
-            APP_GATT_TRACE2("GATTS_REQ_TYPE_PREP_WRITE");
+            APP_GATT_TRACE2("Req PREP_WRITE or WRITE handle:%04x len:%d -- %A", p_data->data.write_req.handle, p_data->data.write_req.val_len, p_data->data.write_req.p_val, p_data->data.write_req.val_len);
             result = app_gatt_write_handler(p_data->conn_id, &(p_data->data.write_req));
             break;
 
         case GATTS_REQ_TYPE_MTU:
-            APP_GATT_TRACE("GATTS_REQ_TYPE_MTU to %d bytes", p_data->data.mtu);
+            APP_GATT_TRACE("Req MTU to %d bytes", p_data->data.mtu);
             break;
 
         case GATTS_REQ_TYPE_CONF:
-            APP_GATT_TRACE2("GATTS_REQ_TYPE_CONF");
             result = gatt_req_conf_handler( p_data->conn_id, p_data->data.handle );
             break;
 
+        case GATTS_REQ_TYPE_WRITE_EXEC:
+             APP_GATT_TRACE2("Req WRITE_EXEC %d - not handled", p_data->data.exec_write);
+            break;
+
         default:
-            APP_GATT_TRACE2("Please check %d hidd_gatt_req type!!!", p_data->request_type);
+            APP_GATT_TRACE2("Check not handled req type %d", p_data->request_type);
             break;
     }
 

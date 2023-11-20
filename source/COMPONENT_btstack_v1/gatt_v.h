@@ -30,7 +30,8 @@
  * of such system or application assumes all risk of such use and in doing
  * so agrees to indemnify Cypress against all liability.
  */
-#pragma once
+#ifndef GATT_V1_H__
+#define GATT_V1_H__
 
 #include "cycfg_gatt_db.h"
 #include "wiced_bt_gatt.h"
@@ -56,3 +57,5 @@ wiced_bt_gatt_status_t gatt_req_cb( wiced_bt_gatt_attribute_request_t *p_data );
 wiced_bt_gatt_status_t gatt_v_callback( wiced_bt_gatt_evt_t event, wiced_bt_gatt_event_data_t * p_data);
 
 wiced_bt_gatt_status_t gatt_req_read_default_handler( uint16_t conn_id, wiced_bt_gatt_read_t * p_read_data );
+
+#endif // GATT_V1_H__

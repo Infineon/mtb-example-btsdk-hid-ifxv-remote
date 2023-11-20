@@ -39,19 +39,13 @@
 #include "wiced_bt_stack.h"
 #include "wiced_memory.h"
 #include "cycfg_bt_settings.h"
+#include "wiced_hidd_lib.h"
 
 ////////////////////////////////////////////////////////////////////////////////
 /// hidd_stack_init
 ////////////////////////////////////////////////////////////////////////////////
 wiced_result_t bt_v_init(wiced_bt_management_cback_t * bt_management_ptr)
 {
-#if is_SDS_capable
-    if (!wiced_hal_mia_is_reset_reason_por())
-    {
-        hidd_link_aon_action_handler(HIDD_LINK_RESTORE_FROM_AON);
-    }
-#endif
-
 #if is_20819Family
     // For 208xx, the chip id is identified by Radio id register; however, the register may get disabled after entering ePDS;
     // therefore, we read it once at power up and save the id.

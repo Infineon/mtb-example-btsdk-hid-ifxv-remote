@@ -39,10 +39,16 @@
  * device
  *
  */
-#pragma once
+#ifndef AUDIO_TYPES_H__
+#define AUDIO_TYPES_H__
+
 #include "wiced_bt_types.h"
 
+#ifdef SUPPORT_AUDIO
 #define audio_is_active()  mic_audio_is_active()
+#else
+#define audio_is_active()  FALSE
+#endif
 
 enum hidd_audio_encoding_e
 {
@@ -73,3 +79,5 @@ typedef int16_t pcm_data_t;
 typedef void (*pcm_data_available_cb_t) (pcm_data_t * p_pcm, uint16_t cnt);
 
 #define AUDIO_BYTE_CNT (AUDIO_SAMPLE_CNT * sizeof(pcm_data_t))
+
+#endif // AUDIO_TYPES_H__

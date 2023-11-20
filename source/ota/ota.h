@@ -30,36 +30,34 @@
  * of such system or application assumes all risk of such use and in doing
  * so agrees to indemnify Cypress against all liability.
  */
-#ifndef APP_BTSTACK_V1_H__
-#define APP_BTSTACK_V1_H__
 
-#include "wiced_bt_types.h"
-#include "cycfg_bt_settings.h"
-#include "wiced_hidd_lib.h"
+/** @file
+ *
+ * This file defines the interface of OTA firmware upgrade service
+ *
+ */
+#ifndef OTA_H__
+#define OTA_H__
 
-#define MAX_MTU_SIZE                     251
+#ifdef OTA_FIRMWARE_UPGRADE
+ #include "wiced.h"
+ #include "wiced_bt_ota_firmware_upgrade.h"
+ #define ota_is_active() wiced_ota_fw_upgrade_is_active()
+ extern uint8_t  ota_fw_upgrade_initialized;
+ #ifdef OTA_SECURE_FIRMWARE_UPGRADE
+  #include "bt_types.h"
+  #include "p_256_multprecision.h"
+  #include "p_256_ecc_pp.h"
 
-#define WICED_TIMER_PARAM_TYPE TIMER_PARAM_TYPE
-
-#ifdef WICED_EVAL
- #define RED_LED        WICED_PLATFORM_LED_2
- #define LINK_LED       WICED_PLATFORM_LED_1
+  // If secure version of the OTA firmware upgrade is used, the app should be linked with the ecdsa256_pub.c
+  // which exports the public key
+  extern Point ecdsa256_public_key;
+  #define ECDSA256_PUBLIC_KEY &ecdsa256_public_key
+ #else
+  #define ECDSA256_PUBLIC_KEY NULL
+ #endif // OTA_SECURE_FIRMWARE_UPGRADE
 #else
- #ifdef RED_LED
-  #undef RED_LED
- #endif
- #define RED_LED        WICED_PLATFORM_LED_1
- #define LINK_LED       WICED_PLATFORM_LED_2
+ #define ota_is_active() FALSE
 #endif
 
-#define cfg_sec_mask() ( wiced_bt_cfg_settings.security_requirement_mask )
-
-#define WICED_BTSTACK_VERSION_MAJOR WICED_SDK_MAJOR_VER
-#define WICED_BTSTACK_VERSION_MINOR WICED_SDK_MINOR_VER
-#define WICED_BTSTACK_VERSION_PATCH WICED_SDK_BUILD_NUMBER
-
-void hidd_enable_interrupt(wiced_bool_t en);
-
-wiced_bt_gatt_status_t app_gatt_read_req_handler( uint16_t conn_id, wiced_bt_gatt_read_t * p_read_data );
-
-#endif // APP_BTSTACK_V1_H__
+#endif // OTA_H__

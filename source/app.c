@@ -11,16 +11,29 @@
  */
 #include "wiced_bt_types.h"
 #include "wiced_bt_dev.h"
+#include "wiced_hal_mia.h"
 #include "wiced_memory.h"
+#include "wiced_sleep.h"
 #include "app.h"
 #include "cycfg_pins.h"
 #include "hci_control_api.h"
-#include "nvram.h"
 
 #if CHIP!=20829 && defined WICED_BT_TRACE_ENABLE
 # undef WICED_BT_TRACE
 # define WICED_BT_TRACE(format,...)   wiced_printf(NULL, 0, (format"\n"), ##__VA_ARGS__)
 #endif
+
+#define AUTO_RECONNECT_DELAY_WHEN_BOOT       5000
+#define AUTO_RECONNECT_DELAY_WHEN_DISCONNECT 500
+#ifdef ALLOW_SDS_IN_DISCOVERABLE
+ //For cold boot, give it more time before allowing SDS; otherwise, it might reset.
+ #define SDS_ALLOWED_IN_MS_WHEN_COLD_BOOT    5000
+#else
+ #define SDS_ALLOWED_IN_MS_WHEN_COLD_BOOT    2000
+#endif
+#define SDS_ALLOWED_IN_MS_WHEN_WARM_BOOT     2000
+
+#include "wiced_bt_uuid.h"
 
 /**********************************************************************************************
  * Report Table.
@@ -47,6 +60,13 @@ static hidd_rpt_t rpt_map[] =
         .rpt_type         =WICED_HID_REPORT_TYPE_INPUT,
         .handle_cccd      =HDLD_BAS_BATTERY_LEVEL_CLIENT_CHAR_CONFIG,
         .handle_val       =HDLC_BAS_BATTERY_LEVEL_VALUE,
+    },
+    // Std output report
+    {
+        .rpt_id           =RPT_ID_OUT_KB_LED,
+        .rpt_type         =WICED_HID_REPORT_TYPE_OUTPUT,
+        .handle_cccd      =0, // no cccd for output
+        .handle_val       =HDLC_HIDS_OUT_RPT_KB_LED_VALUE,
     },
 #ifdef HDLS_ATVS
     // Audio data
@@ -80,13 +100,6 @@ static hidd_rpt_t rpt_map[] =
         .handle_val       =HDLC_IFXVS_IFXVS_DEVICE_VALUE,
     },
 #endif
-    // Std output report
-    {
-        .rpt_id           =RPT_ID_OUT_KB_LED,
-        .rpt_type         =WICED_HID_REPORT_TYPE_OUTPUT,
-        .handle_cccd      =0, // no cccd for output
-        .handle_val       =HDLC_HIDS_OUT_RPT_KB_LED_VALUE,
-    },
 };
 
 #define RPT_SIZE (sizeof(rpt_map) / sizeof(hidd_rpt_t))
@@ -178,7 +191,7 @@ static void app_key_detected(uint8_t keyCode, uint8_t keyDown)
     case END_OF_SCAN_CYCLE:
         break;
     case ROLLOVER:
-        WICED_BT_TRACE("roll over key");
+        WICED_BT_TRACE("ROLLOVER key");
         break;
     default:
         WICED_BT_TRACE("kc:%d %c", keyCode, keyDown ? 'D':'U');
@@ -219,8 +232,12 @@ static void app_hci_key_event(uint8_t keyCode, wiced_bool_t keyDown)
             keyCode = BACK_KEY_INDEX;
             break;
 
+#ifdef SUPPORT_IR
+        case HCI_CONTROL_HIDD_KEY_IR:
+            keyCode = IR_KEY_INDEX;
+            break;
+#endif
         // case HCI_CONTROL_HIDD_KEY_POWER:
-        // case HCI_CONTROL_HIDD_KEY_IR:
         // case HCI_CONTROL_HIDD_KEY_MOTION:
         default:
             WICED_BT_TRACE("Function not supported");
@@ -230,6 +247,154 @@ static void app_hci_key_event(uint8_t keyCode, wiced_bool_t keyDown)
     app_key_detected(keyCode, keyDown);
 }
 #endif
+
+////////////////////////////////////////////////////////////////////////////////
+/// Function Name: APP_sleep_handler
+////////////////////////////////////////////////////////////////////////////////
+/// Summary:
+///    Sleep permit query to check if sleep is allowed and sleep time
+///
+/// Parameters:
+///  type -- query type. It can be WICED_SLEEP_POLL_TIME_TO_SLEEP or WICED_SLEEP_POLL_SLEEP_PERMISSION
+///
+/// Return:
+///  WICED_SLEEP_NOT_ALLOWED when not allow to sleep.
+///
+///  If the query type is WICED_SLEEP_POLL_TIME_TO_SLEEP,
+///     it returns WICED_SLEEP_MAX_TIME_TO_SLEEP or the time to sleep
+///
+///  otherwise, the query type should be WICED_SLEEP_POLL_SLEEP_PERMISSION.
+///     It returns WICED_SLEEP_ALLOWED_WITHOUT_SHUTDOWN when allowed to sleep, but no SDS nor ePDS.
+///     otherwise, it returns WICED_SLEEP_ALLOWED_WITH_SHUTDOWN when allowed to enter SDS/ePDS
+///
+////////////////////////////////////////////////////////////////////////////////
+static uint32_t app_sleep_handler(wiced_sleep_poll_type_t type )
+{
+    uint32_t ret = WICED_SLEEP_NOT_ALLOWED;
+
+#if SLEEP_ALLOWED
+    switch(type)
+    {
+        case WICED_SLEEP_POLL_TIME_TO_SLEEP:
+            ret = WICED_SLEEP_MAX_TIME_TO_SLEEP;
+ #if SFI_DEEP_SLEEP
+            // In 20835, sfi CS may contains glitch that wakes up Flash result in high current. Apply workaround to put sfi into powerdown
+            if (pmu_attemptSleepState == 5 )
+            {
+                nvram_exit_deep_sleep(FALSE);
+                nvram_enter_deep_sleep();
+            }
+ #endif
+            break;
+
+        case WICED_SLEEP_POLL_SLEEP_PERMISSION:
+            ret = WICED_SLEEP_ALLOWED_WITHOUT_SHUTDOWN;
+ #if SLEEP_ALLOWED > 1
+            if (!wiced_hidd_is_transport_detection_polling_on() && sds_is_allowed()
+
+                // If LE connection is established and expected link parameter update,
+                // we don't deep sleep until the params update successfully.
+                && (!link_is_connected() || link_params_update_is_expected())
+
+                // a key is not down
+                && !key_active()
+
+                // audio is not active
+                && !audio_is_active()
+
+                // IR is not active
+                && !ir_is_active()
+
+                // Findme is not active
+                && !findme_is_active()
+
+                // OTA firmware upgrade is not active
+                && !ota_is_active()
+               )
+            {
+                sds_save_data_to_aon();
+                ret = WICED_SLEEP_ALLOWED_WITH_SHUTDOWN;
+            }
+ #endif
+            break;
+    }
+#endif
+    return ret;
+}
+
+/*******************************************************************************
+ * sleep configuration
+ *******************************************************************************/
+wiced_sleep_config_t    sleep_config = {
+    .sleep_mode             = WICED_SLEEP_MODE_NO_TRANSPORT,  //sleep_mode
+    .host_wake_mode         = 0,                              //host_wake_mode
+    .device_wake_mode       = 0,                              //device_wake_mode
+    .device_wake_source     = WICED_SLEEP_WAKE_SOURCE_GPIO | WICED_SLEEP_WAKE_SOURCE_KEYSCAN | WICED_SLEEP_WAKE_SOURCE_QUAD,  //device_wake_source
+    .device_wake_gpio_num   = 255,                            //must set device_wake_gpio_num to 255 for WICED_SLEEP_MODE_NO_TRANSPORT
+    .sleep_permit_handler   = app_sleep_handler,              //sleep_permit_handler
+#if defined(CYW20819A1) || defined(CYW20820A1)
+    .post_sleep_cback_handler=NULL,                           //post_sleep_handler
+#endif
+};
+
+/////////////////////////////////////////////////////////////////////////////////
+/// app_cold_boot
+/////////////////////////////////////////////////////////////////////////////////
+static void app_cold_boot()
+{
+#ifdef WICED_EVAL
+    if (button_down())
+    {
+        WICED_BT_TRACE( "User button pressed during start up -> removing pairing info" );
+        if (host_is_paired())
+        {
+            app_remove_host_bonding();
+        }
+    }
+#endif
+
+    bt_disconnect();
+    if (host_is_paired())
+    {
+        WICED_BT_TRACE("bonded info in NVRAM");
+#ifdef START_ADV_WHEN_POWERUP_NO_CONNECTED
+        bt_enter_reconnect();
+#else
+ #ifdef AUTO_RECONNECT
+        bt_delayed_reconnect(AUTO_RECONNECT_DELAY_WHEN_BOOT);
+ #endif
+#endif
+    }
+    else
+    {
+
+#ifdef START_ADV_WHEN_POWERUP_NO_CONNECTED
+        bt_enter_pairing();
+#else
+        button_check_boot_action();
+#endif
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+/// app_cold_boot
+/////////////////////////////////////////////////////////////////////////////////
+static void app_init_action()
+{
+    if(wiced_hal_mia_is_reset_reason_por())
+    {
+        sds_allowed_in_ms(SDS_ALLOWED_IN_MS_WHEN_COLD_BOOT);
+        WICED_BT_TRACE("cold boot");
+        app_cold_boot();
+    }
+    else
+    {
+        sds_allowed_in_ms(SDS_ALLOWED_IN_MS_WHEN_WARM_BOOT);
+        WICED_BT_TRACE("warm boot");
+        sds_wake();
+        button_check_boot_action();
+    }
+}
 
 /******************************************************************************
  *     Public Functions
@@ -271,6 +436,9 @@ wiced_bool_t app_check_cccd_flags( uint16_t handle )
  ********************************************************************/
 void app_remove_host_bonding(void)
 {
+    // Stop adv if it is advertising
+    bt_stop_advertisement();
+
     if (link_is_connected())
     {
         WICED_BT_TRACE( "Remove bonding, disconnecting link" );
@@ -281,57 +449,13 @@ void app_remove_host_bonding(void)
     {
         uint8_t *bonded_bdadr = host_addr();
 
-#ifdef FILTER_ACCEPT_LIST_FOR_ADVERTISING
-        //stop advertising anyway before Filter Accept List operation
-        bt_stop_advertisement();
-
-        //remove from Filter Accept List
-        WICED_BT_TRACE( "remove from Filter Accept List : %B", bonded_bdadr );
-        wiced_bt_ble_update_advertising_filter_accept_list( WICED_FALSE, bonded_bdadr );
-
-        //clear whitelist
-        wiced_bt_ble_clear_filter_accept_list();
-#endif
-
         WICED_BT_TRACE( "remove bonded device : %B", bonded_bdadr );
         wiced_bt_dev_delete_bonded_device( bonded_bdadr );
 
         host_remove();
     }
+    hci_control_send_paired_host_info();
 }
-
-#ifdef OTA_FIRMWARE_UPGRADE
-#include "wiced_bt_ota_firmware_upgrade.h"
-static ota_fw_upgrade_status_callback_t ota_fw_upgrade_status_callback = NULL;
-static uint8_t  ota_fw_upgrade_initialized = WICED_FALSE;
-#ifdef OTA_SECURE_FIRMWARE_UPGRADE
- #include "bt_types.h"
- #include "p_256_multprecision.h"
- #include "p_256_ecc_pp.h"
-
- // If secure version of the OTA firmware upgrade is used, the app should be linked with the ecdsa256_pub.c
- // which exports the public key
- extern Point    ecdsa256_public_key;
-#endif // OTA_SECURE_FIRMWARE_UPGRADE
-/*
- *
- */
-void register_ota_fw_upgrade_status_callback(ota_fw_upgrade_status_callback_t cb)
-{
-    ota_fw_upgrade_status_callback = cb;
-}
-
-/*
- * Process write request or command from peer device
- */
-void ota_fw_upgrade_status(uint8_t status)
-{
-    if (ota_fw_upgrade_status_callback)
-    {
-        ota_fw_upgrade_status_callback(status);
-    }
-}
-#endif // OTA_FIRMWARE_UPGRADE
 
 /********************************************************************
  * Function Name: app_gatt_write_handler
@@ -344,31 +468,45 @@ wiced_bt_gatt_status_t app_gatt_write_handler( uint16_t conn_id, wiced_bt_gatt_w
     uint16_t handle = p_wr_data->handle;
     wiced_bt_gatt_status_t result = WICED_BT_GATT_ATTRIBUTE_NOT_FOUND;
 
+#ifdef SUPPORT_AUDIO
     // Check if the write request is for audio handle
     if (is_audio_handle(handle))
     {
         result = audio_gatt_write_handler(conn_id, p_wr_data);
     }
     else
+#endif
+#ifdef SUPPORT_FINDME
+    if ( (result = findme_gatts_req_write_handler(conn_id, p_wr_data)) != WICED_BT_GATT_NOT_FOUND )
+    {
+        return result;
+    }
+    else
+#endif
 #ifdef OTA_FIRMWARE_UPGRADE
     // if write request is for the OTA FW upgrade service, pass it to the library to process
     if (wiced_ota_fw_upgrade_is_gatt_handle(p_wr_data->handle))
     {
-        WICED_BT_TRACE("\nOTA hidd_gatt_write_handler %04x", p_wr_data->handle );
         if (!ota_fw_upgrade_initialized)
         {
-            WICED_BT_TRACE("\nOTA upgrade Init");
+            WICED_BT_TRACE("OTA upgrade Init");
+
             /* OTA Firmware upgrade Initialization */
- #ifdef OTA_SECURE_FIRMWARE_UPGRADE
-            if (wiced_ota_fw_upgrade_init(&ecdsa256_public_key, ota_fw_upgrade_status, NULL) == WICED_FALSE)
- #else
-            if (wiced_ota_fw_upgrade_init(NULL, ota_fw_upgrade_status, NULL) == WICED_FALSE)
- #endif
+            if (wiced_ota_fw_upgrade_init(ECDSA256_PUBLIC_KEY, NULL, NULL) == WICED_FALSE)
             {
-                WICED_BT_TRACE("\nOTA upgrade Init failure!!!");
+                WICED_BT_TRACE("OTA upgrade Init failure!!!");
                 return WICED_BT_GATT_ERR_UNLIKELY;
             }
             ota_fw_upgrade_initialized = WICED_TRUE;
+        }
+
+        if (HANDLE_OTA_FW_UPGRADE_DATA == p_wr_data->handle)
+        {
+            WICED_BT_TRACE("OTA data: off:%d len:%d", p_wr_data->offset, p_wr_data->val_len);
+        }
+        else
+        {
+            WICED_BT_TRACE("OTA GATT write: hdl:0x%04x off:%d len:%d data:%A", p_wr_data->handle, p_wr_data->offset, p_wr_data->val_len, p_wr_data->p_val, p_wr_data->val_len);
         }
         return wiced_ota_fw_upgrade_write_handler(conn_id, p_wr_data);
     }
@@ -380,7 +518,6 @@ wiced_bt_gatt_status_t app_gatt_write_handler( uint16_t conn_id, wiced_bt_gatt_w
         // Check if the write request is for the audio command
         result = hidd_gatt_write_handler( conn_id, p_wr_data );
     }
-
     if (result == WICED_BT_GATT_ATTRIBUTE_NOT_FOUND)
     {
         // let the default handler to take care of it
@@ -398,12 +535,9 @@ wiced_bt_gatt_status_t app_gatt_write_handler( uint16_t conn_id, wiced_bt_gatt_w
  *******************************************************************/
 void app_link_up(wiced_bt_gatt_connection_status_t * p_status)
 {
-    WICED_BT_TRACE("Link up, conn_id:%04x peer_addr:%B type:%d", p_status->conn_id, p_status->bd_addr, p_status->addr_type);
-
-#ifdef OTA_FIRMWARE_UPGRADE
-    // Pass connection up event to the OTA FW upgrade library
-    wiced_ota_fw_upgrade_connection_status_event(p_status);
-#endif
+    //configure ATT MTU size with peer device
+    WICED_BT_TRACE("Configure MTU with size %d",  MAX_MTU_SIZE);
+    wiced_bt_gatt_configure_mtu(link_conn_id(), MAX_MTU_SIZE);
 
     link_set_acl_conn_interval(wiced_bt_cfg_settings.ble_scan_cfg.conn_min_interval,
                                wiced_bt_cfg_settings.ble_scan_cfg.conn_max_interval,
@@ -412,6 +546,12 @@ void app_link_up(wiced_bt_gatt_connection_status_t * p_status)
     led_on(LINK_LED);
     hidd_set_conn_id(p_status->conn_id);
     hci_control_send_connect_evt( p_status->addr_type, p_status->bd_addr, p_status->conn_id, p_status->link_role );
+
+    // if link is not bonded, give it 10 sec for bonding before allowing SDS
+    if (!link_is_bonded())
+    {
+        sds_allowed_in_ms(10000); // no SDS for 10 sec.
+    }
 }
 
 /********************************************************************
@@ -423,8 +563,6 @@ void app_link_up(wiced_bt_gatt_connection_status_t * p_status)
 void app_link_down(wiced_bt_gatt_connection_status_t * p_status)
 {
     uint16_t conn_id = link_conn_id();  // if we have multiple links, the link_conn_id() can return the secondary conn_id.
-
-    WICED_BT_TRACE("Link down, id:0x%04x reason: %d (0x%02x)",  p_status->conn_id, p_status->reason, p_status->reason);
 
     hidd_set_conn_id(conn_id);
     hci_control_send_disconnect_evt( p_status->reason, p_status->conn_id );
@@ -443,6 +581,10 @@ void app_link_down(wiced_bt_gatt_connection_status_t * p_status)
             hci_control_send_connect_evt( p_status->addr_type, p_status->bd_addr, p_status->conn_id, p_status->link_role );
         }
     }
+
+#ifdef AUTO_RECONNECT
+    bt_delayed_reconnect(AUTO_RECONNECT_DELAY_WHEN_DISCONNECT);
+#endif
 }
 
 /********************************************************************
@@ -462,7 +604,22 @@ void app_adv_state_changed(wiced_bt_ble_advert_mode_t old_adv, wiced_bt_ble_adve
     {
         if (old_adv == BTM_BLE_ADVERT_OFF)
         {
-            WICED_BT_TRACE("Advertisement %d started", adv);
+            wiced_bt_device_address_t  bda;
+#ifdef LE_LOCAL_PRIVACY_SUPPORT
+            memcpy(bda, wiced_btm_get_private_bda(), BD_ADDR_LEN);
+            char * ad_type = "random private address";
+#else
+            wiced_bt_dev_read_local_addr(bda);
+            char * ad_type = "public address";
+#endif
+            if (adv <= BTM_BLE_ADVERT_DIRECTED_LOW)
+            {
+                WICED_BT_TRACE("Direct adv %d started with %s %B to host %BaddrType:%d", adv, ad_type, bda, host_addr(), host_addr_type());
+            }
+            else
+            {
+                WICED_BT_TRACE("Undirect adv %d started with %s %B", adv, ad_type, bda);
+            }
             led_blink(LINK_LED, 0, host_is_paired() ? 200: 500);     // use faster blink LINK line to indicate reconnecting
         }
         else
@@ -509,32 +666,36 @@ wiced_result_t app_init(void)
     wiced_bt_app_init();
 #endif
 
+    sds_init();
+    link_init();
     hci_control_register_key_handler(app_hci_key_event);
 
     gatt_initialize();
     hidd_cfg.gatt_lookup_table_size = app_gatt_db_ext_attr_tbl_size;
-    hidd_init(&hidd_cfg);
+
+    wiced_hidd_app_init(BT_DEVICE_TYPE_BLE);
+    /* Allow peer to pair */
+    wiced_bt_set_pairable_mode(WICED_TRUE, 0);
+    wiced_btm_ble_update_advertisement_filter_policy(0);
+
+    wiced_sleep_configure( &sleep_config );
 
     /* Initialize each submodule */
-    button_init();
     bat_init(app_shutdown);
     audio_init();
     key_init(NUM_KEYSCAN_ROWS, NUM_KEYSCAN_COLS, app_key_detected);
+    button_init();
+    findme_init();
+    hidd_init(&hidd_cfg);
+
+#ifdef SUPPORT_IR
+    ir_init(IR_TX_GPIO);
+    hci_control_set_capability(audio_capability(), 0, HCI_CONTROL_HIDD_IR_SUPPORT);
+#else
     hci_control_set_capability(audio_capability(), 0, 0);
-
-#ifdef WICED_EVAL
-    if (button_down())
-    {
-        WICED_BT_TRACE( "User button pressed during start up" );
-        if (host_is_paired())
-        {
-            app_remove_host_bonding();
-        }
-        WICED_BT_TRACE( "Enter pairing" );
-    }
 #endif
-    bt_enter_pairing();
 
+    app_init_action();
     WICED_BT_TRACE("Free RAM bytes=%d bytes", wiced_memory_get_free_bytes());
 
     return WICED_BT_SUCCESS;
@@ -551,20 +712,79 @@ void application_start( void )
 {
     // Initialize LED/UART for debug
     wiced_set_debug_uart(WICED_ROUTE_DEBUG_TO_PUART);
+#ifdef ENABLE_BT_SPY_LOG
+    WICED_BT_TRACE("Routing debug msg to WICED_UART, open ClientControl/BtSpy");
+    // Initialize LED/UART for debug
+    wiced_set_debug_uart(WICED_ROUTE_DEBUG_TO_WICED_UART);
+#endif
     led_init(led_count, platform_led);
 
-    bt_init();                                // WICED_BT_TRACE starts to work after bt_init()
+    bt_init();                                // WICED_BT_TRACE starts to work after bt_init() for 20829
     nvram_init(NULL);                         // use default default NVRAM read/write
     hci_control_init();
 
     WICED_BT_TRACE("\n<< %s >>", app_gap_device_name);
+#ifdef TESTING_USING_HCI
+    WICED_BT_TRACE("TESTING_USING_HCI");
+#endif
     WICED_BT_TRACE("DEV=%d btstack:%d.%d.%d", CHIP, WICED_BTSTACK_VERSION_MAJOR, WICED_BTSTACK_VERSION_MINOR, WICED_BTSTACK_VERSION_PATCH);
+
+#if defined(ALLOW_SDS_IN_DISCOVERABLE) || defined(ENDLESS_LE_ADVERTISING)
+    ((wiced_bt_cfg_ble_advert_settings_t *) &wiced_bt_cfg_settings.ble_advert_cfg)->low_duty_duration = 0;
+#endif
+
+    WICED_BT_TRACE("SLEEP_ALLOWED=%d",SLEEP_ALLOWED);
+    WICED_BT_TRACE("LED=%d",LED_SUPPORT);
+
+#ifdef OTA_FIRMWARE_UPGRADE
+    WICED_BT_TRACE("OTA_FW_UPGRADE");
+ #ifdef OTA_SECURE_FIRMWARE_UPGRADE
+    WICED_BT_TRACE("OTA_SEC_FW_UPGRADE");
+ #endif
+#endif
+#ifdef HDLS_IFXVS
+    WICED_BT_TRACE("IFX-Voice Profile");
+#endif
+#ifdef HDLS_ATVS
+    WICED_BT_TRACE("Google-Voice Profile");
+#endif
+#ifdef MSBC_ENCODER
+    WICED_BT_TRACE("Codec=MSBC");
+#elif defined ADPCM_ENCODER
+    WICED_BT_TRACE("Codec=ADPCM");
+#elif defined OPUS_ENCODER
+    WICED_BT_TRACE("Codec=OPUS");
+#endif
 #ifdef SUPPORT_DIGITAL_MIC
     WICED_BT_TRACE("MIC=Digital");
 #else
     WICED_BT_TRACE("MIC=Analog");
 #endif
-    WICED_BT_TRACE("SLEEP_ALLOWED=%d",SLEEP_ALLOWED);
+#ifdef AUTO_RECONNECT
+    WICED_BT_TRACE("AUTO_RECONNECT");
+#endif
+#ifdef SKIP_CONNECT_PARAM_UPDATE_EVEN_IF_NO_PREFERED
+    WICED_BT_TRACE("SKIP_PARAM_UPDATE");
+#endif
+#ifdef START_ADV_WHEN_POWERUP_NO_CONNECTED
+    WICED_BT_TRACE("START_ADV_ON_POWERUP");
+#endif
+#ifdef CONNECTED_ADVERTISING_SUPPORTED
+    WICED_BT_TRACE("ENABLE_CONNECTED_ADV");
+#endif
+#ifdef ENDLESS_LE_ADVERTISING
+    WICED_BT_TRACE("ENDLESS_ADV");
+#endif
+#ifdef LE_LOCAL_PRIVACY_SUPPORT
+    WICED_BT_TRACE("LE_LOCAL_PRIVACY_SUPPORT");
+#endif
+#ifdef SUPPORT_IR
+    WICED_BT_TRACE("ENABLE_IR");
+#endif
+#ifdef SUPPORT_FINDME
+    WICED_BT_TRACE("ENABLE_FINDME");
+#endif
+
 #if BT_TRACE
     WICED_BT_TRACE("BT_TRACE=%d", BT_TRACE);
 #endif
@@ -573,6 +793,9 @@ void application_start( void )
 #endif
 #if HIDD_TRACE
     WICED_BT_TRACE("HIDD_TRACE=%d", HIDD_TRACE);
+#endif
+#if SDS_TRACE
+    WICED_BT_TRACE("SDS_TRACE=%d", SDS_TRACE);
 #endif
 #if HCI_TRACE
     WICED_BT_TRACE("HCI_TRACE=%d", HCI_TRACE);
@@ -586,6 +809,12 @@ void application_start( void )
 #if NVRAM_TRACE
     WICED_BT_TRACE("NVRAM_TRACE=%d", NVRAM_TRACE);
 #endif
+#if IR_TRACE
+    WICED_BT_TRACE("IR_TRACE=%d", IR_TRACE);
+#endif
+#if FINDME_TRACE
+    WICED_BT_TRACE("FINDME_TRACE=%d", FINDME_TRACE);
+#endif
 #if AUDIO_TRACE
     WICED_BT_TRACE("AUDIO_TRACE=%d", AUDIO_TRACE);
 #endif
@@ -598,6 +827,10 @@ void application_start( void )
 #if PROTOCOL_TRACE
     WICED_BT_TRACE("PROTOCOL_TRACE=%d", PROTOCOL_TRACE);
 #endif
+#ifdef LE_LOCAL_PRIVACY_SUPPORT
+    WICED_BT_TRACE("LE_LOCAL_PRIVACY_SUPPORT");
+#endif
+
 }
 
 /* end of file */

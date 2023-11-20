@@ -35,6 +35,15 @@ ifeq ($(WHICHFILE),true)
 $(info Processing $(lastword $(MAKEFILE_LIST)))
 endif
 
+$(info !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!)
+$(info !!!!!!!!                 WARNING                     !!!!!!!!!!!!!!!!)
+$(info This sample application demonstrates a custom GATT service with)
+$(info 16-bit service UUID 0x0000.  This is not a valid service ID and must)
+$(info not be used in a product. Valid 16-bit service UUID must be purchased)
+$(info from the Bluetooth SIG and code must be updated with the valid UUID.)
+$(info See application README.md for more details.)
+$(info !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!)
+
 #
 # Basic Configuration
 #
@@ -47,8 +56,10 @@ VERBOSE=
 TARGET=CYW920835M2EVB-01
 
 SUPPORTED_TARGETS = \
+    CYW920835M2EVB-01 \
     CYW920835REF-RCU-01 \
-    CYW920835M2EVB-01
+    CYBLE-343072-EVAL-M2B \
+    CYBLE-333074-EVAL-M2B
 
 ifeq ($(filter $(TARGET),$(SUPPORTED_TARGETS)),)
  $(error TARGET $(TARGET) is not supported for this application. Edit SUPPORTED_TARGETS in the code example makefile to add new BSPs)
@@ -92,7 +103,12 @@ UART?=AUTO
 ####################################################
 # To use ClientControl to control the device via HCI_UART port, TESTING_USING_HCI flag must be turned on
 #
+# BtSpy logs should work by enabling TESTING_USING_HCI. However,
+# by enabling ENABLE_BT_SPY will route debug message from PUART to BtSpy (WICED_UART).
+# TESTING_USING_HCI must be enabled for ENABLE_BT_SPY option to take effect.
+#
 TESTING_USING_HCI?=1
+ENABLE_BT_SPY?=0
 
 ####################################################
 # SLEEP_ALLOWED
@@ -108,6 +124,16 @@ SLEEP_ALLOWED?=2
 #  LED=1  Use LED for status indication
 #
 LED?=1
+
+####################################################
+# Use OTA_FW_UPGRADE=1 to enable Over-the-air firmware upgrade functionality
+# Use OTA_SEC_FW_UPGRADE=1 in the make target to use secure OTA procedure.
+# OTA_SEC_FW_UPGRADE_DEFAULT takes effect only when OTA_FW_UPGRADE_DEFAULT=1.
+# When secure OTA is enabled, The ecdsa256_public_key content should be updated
+# with the generated key in file ecdsa256_pub.c.
+#
+OTA_FW_UPGRADE?=1
+OTA_SEC_FW_UPGRADE?=0
 
 ####################################################
 # AUDIO defines
@@ -133,15 +159,58 @@ AUDIO?=IFXV
 CODEC?=OPUS
 PDM?=0
 
+####################################################
+# Link related flags
+#
+# SKIP_PARAM_UPDATE
+#   Use SKIP_PARAM_UPDATE=1 to not request connection parameter update immediately when
+#   received LE conn param update complete event with non-preferred values.
+#   Because audio requires shorter connection interval to steam data, skipping link parameter
+#   update can cause audio not to work propertly until it is updated.
+#
+# AUTO_RECONNECT
+#   Use AUTO_RECONNECT=1 to automatically reconnect when connection drops
+#
+# START_ADV_ON_POWERUP
+#   Use START_ADV_ON_POWERUP=1 to start advertising on power up. If paired it reconnect when power up.
+#
+# ENABLE_CONNECTED_ADV
+#   Use ENABLE_CONNECTED_ADV=1 to enable advertising while connected
+#
+# ENDLESS_ADV
+#   Use ENDLESS_ADV=1 to enable endless advertising. Otherwise, the advertisement expires in given period.
+#
+# LE_LOCAL_PRIVACY
+#   Use LE_LOCAL_PRIVACY=1 to advertise with Resolvable Private Address (RPA)
+#
+SKIP_PARAM_UPDATE?=0
+AUTO_RECONNECT?=0
+START_ADV_ON_POWERUP?=1
+ENABLE_CONNECTED_ADV?=0
+ENDLESS_ADV?=0
+LE_LOCAL_PRIVACY=1
+
+####################################################
+# Use ENABLE_IR=1 to enable IR support.
+#
+# Do not enable for CYW920835REF-RCU-01 as P38 is used for battery monitoring in the hardware design.
+# It can cause battery monitor malfunction and wrongfully to shutdown the device.
+# To enable it, please change the code to use other GPIO.
+#
+ENABLE_IR?=0
+
+####################################################
+# Use ENABLE_FINDME=1 to enable Find Me profile support
+ENABLE_FINDME?=1
+
 #
 # App defines
 #
 CY_APP_DEFINES = \
   -DSUPPORT_KEY_REPORT \
-  -DBT_CONFIGURATOR_SUPPORT \
-  -DAUTO_PAIRING \
+  -DSWITCH_DIRECT_TO_UNDIRECT_ADV \
+  -DSFI_DEEP_SLEEP \
   -DBATTERY_REPORT_SUPPORT \
-  -DBLE_SUPPORT \
   -DWICED_BT_TRACE_ENABLE \
   -DLED_SUPPORT=$(LED) \
   -DSLEEP_ALLOWED=$(SLEEP_ALLOWED)
@@ -150,6 +219,9 @@ CY_APP_PATCH_LIBS += wiced_hidd_lib.a
 
 ifeq ($(TESTING_USING_HCI),1)
  CY_APP_DEFINES += -DTESTING_USING_HCI
+ ifeq ($(ENABLE_BT_SPY),1)
+  CY_APP_DEFINES += -DENABLE_BT_SPY_LOG
+ endif
 endif
 
 ifeq ($(filter $(TARGET), CYW920835REF-RCU-01),)
@@ -157,6 +229,27 @@ ifeq ($(filter $(TARGET), CYW920835REF-RCU-01),)
 else
  CY_APP_DEFINES += -DSUPPORT_KEYSCAN
 endif
+
+ifeq ($(OTA_FW_UPGRADE),1)
+ # DEFINES
+ CY_APP_DEFINES += -DOTA_FIRMWARE_UPGRADE
+ CY_APP_DEFINES += -DDISABLED_PERIPHERAL_LATENCY_ONLY
+# OTA_SKIP_CONN_PARAM_UPDATE - when enabled, it will use the current connection parameter. When not defined, the OTA libraray will use 7.5 ms interval, makes data transfer much faster.
+# CY_APP_DEFINES += -DOTA_SKIP_CONN_PARAM_UPDATE
+ ifeq ($(OTA_SEC_FW_UPGRADE), 1)
+  CY_APP_DEFINES += -DOTA_SECURE_FIRMWARE_UPGRADE
+  COMPONENTS += sec_ota
+ else
+  COMPONENTS += ota
+ endif # OTA_SEC_FW_UPGRADE
+ # COMPONENTS
+ COMPONENTS += fw_upgrade_lib
+else
+ ifeq ($(OTA_SEC_FW_UPGRADE),1)
+  $(error setting OTA_SEC_FW_UPGRADE=1 requires OTA_FW_UPGRADE also set to 1)
+ endif # OTA_SEC_FW_UPGRADE
+ COMPONENTS += no_ota
+endif # OTA_FW_UPGRADE
 
 ifeq ($(AUDIO),)
  $(info Audio disabled)
@@ -191,25 +284,55 @@ else
    $(error Google Voice is not implemeneted for this release)
   endif
 
-  ifeq ($(CODEC),MSBC)
-    COMPONENTS += msbc
+  ifeq ($(CODEC),ADPCM)
+   COMPONENTS += adpcm
+   CY_APP_PATCH_LIBS += adpcm_lib.a
+   CY_APP_DEFINES += -DADPCM_ENCODER
   else
-   ifeq ($(CODEC),ADPCM)
-    COMPONENTS += adpcm
-    CY_APP_PATCH_LIBS += adpcm_lib.a
-    CY_APP_DEFINES += -DADPCM_ENCODER
+   ifeq ($(CODEC),OPUS)
+    COMPONENTS += opus
+   CY_APP_DEFINES += -DOPUS_ENCODER
+    # for *.mk to include CYWxxxxxx_OPUS_CELT.cgs instead of CYWxxxxxx.cgs
+    OPUS_CELT_ENCODER = 1
    else
-    ifeq ($(CODEC),OPUS)
-     COMPONENTS += opus
-     # for *.mk to include CYWxxxxxx_OPUS_CELT.cgs instead of CYWxxxxxx.cgs
-     OPUS_CELT_ENCODER = 1
-    else
-     COMPONENTS += pcm
-    endif
+    CY_APP_DEFINES += -DCODEC_STR="Disabled"
+    COMPONENTS += pcm
    endif
   endif
  endif
  $(info AUDIO=$(AUDIO), CODEC=$(CODEC), $(MIC) MIC)
+endif
+
+ifeq ($(AUTO_RECONNECT),1)
+ CY_APP_DEFINES += -DAUTO_RECONNECT
+endif
+
+ifeq ($(SKIP_PARAM_UPDATE),1)
+ CY_APP_DEFINES += -DSKIP_CONNECT_PARAM_UPDATE_EVEN_IF_NO_PREFERED
+endif
+
+ifeq ($(START_ADV_ON_POWERUP),1)
+ CY_APP_DEFINES += -DSTART_ADV_WHEN_POWERUP_NO_CONNECTED
+endif
+
+ifeq ($(ENABLE_CONNECTED_ADV),1)
+ CY_APP_DEFINES += -DCONNECTED_ADVERTISING_SUPPORTED
+endif
+
+ifeq ($(ENDLESS_ADV),1)
+ CY_APP_DEFINES += -DENDLESS_LE_ADVERTISING
+endif
+
+ifeq ($(LE_LOCAL_PRIVACY),1)
+ CY_APP_DEFINES += -DLE_LOCAL_PRIVACY_SUPPORT
+endif
+
+ifeq ($(ENABLE_IR),1)
+ CY_APP_DEFINES += -DSUPPORT_IR
+endif
+
+ifeq ($(ENABLE_FINDME),1)
+ CY_APP_DEFINES += -DSUPPORT_FINDME
 endif
 
 ################################################################################
@@ -220,8 +343,12 @@ TRACE_BT?=0
 TRACE_GATT?=0
 TRACE_HIDD?=0
 TRACE_HCI?=0
+TRACE_HOST?=0
+TRACE_SDS?=0
 TRACE_LED?=0
 TRACE_KEY?=0
+TRACE_IR?=0
+TRACE_FINDME?=0
 TRACE_NVRAM?=0
 TRACE_AUDIO?=0
 TRACE_MIC?=0
@@ -229,8 +356,9 @@ TRACE_CODEC?=0
 TRACE_PROTOCOL?=0
 
 DEFINES += BT_TRACE=$(TRACE_BT) GATT_TRACE=$(TRACE_GATT) HIDD_TRACE=$(TRACE_HIDD) HCI_TRACE=$(TRACE_HCI)
-DEFINES += LED_TRACE=$(TRACE_LED) KEY_TRACE=$(TRACE_KEY) NVRAM_TRACE=$(TRACE_NVRAM)
+DEFINES += LED_TRACE=$(TRACE_LED) KEY_TRACE=$(TRACE_KEY) NVRAM_TRACE=$(TRACE_NVRAM) HOST_TRACE=$(TRACE_HOST)
 DEFINES += AUDIO_TRACE=$(TRACE_AUDIO) MIC_TRACE=$(TRACE_MIC) CODEC_TRACE=$(TRACE_CODEC) PROTOCOL_TRACE=$(TRACE_PROTOCOL)
+DEFINES += IR_TRACE=$(TRACE_IR) FINDME_TRACE=$(TRACE_FINDME) SDS_TRACE=$(TRACE_SDS)
 
 ################################################################################
 # Paths

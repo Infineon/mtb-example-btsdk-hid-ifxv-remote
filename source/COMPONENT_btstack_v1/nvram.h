@@ -30,7 +30,8 @@
  * of such system or application assumes all risk of such use and in doing
  * so agrees to indemnify Cypress against all liability.
  */
-#pragma once
+#ifndef NVRAM_V1_H__
+#define NVRAM_V1_H__
 
 #include "wiced_bt_types.h"
 #include "wiced_hal_nvram.h"
@@ -38,6 +39,23 @@
 /******************************************************************************
  * macro defines
  ******************************************************************************/
+#if SFI_DEEP_SLEEP
+ extern uint8_t pmu_attemptSleepState;
+ extern void sfi_enter_deep_power_down(void);
+ extern void sfi_exit_deep_power_down(BOOL8 forceExitDeepPowerDown);
+ extern void sfi_allow_deep_sleep(void);
+ #define nvram_allow_deep_sleep() sfi_allow_deep_sleep();
+ #define nvram_enter_deep_sleep() sfi_enter_deep_power_down()
+ #define nvram_exit_deep_sleep(t) sfi_exit_deep_power_down(t)
+ #define nvram_deep_sleep() {sfi_allow_deep_sleep(); sfi_enter_deep_power_down();}
+ #define nvram_init(c) nvram_deep_sleep()
+#else
+ #define nvram_allow_deep_sleep()
+ #define nvram_enter_deep_sleep()
+ #define nvram_exit_deep_sleep()
+ #define nvram_deep_sleep()
+ #define nvram_init(c)
+#endif
 
 /******************************************************************************
  * Type Definitions
@@ -93,4 +111,5 @@ wiced_bool_t nvram_write( uint16_t vs_id, uint8_t * p_data, uint16_t data_length
 /*
  * Not used in stack_v1
  */
-#define nvram_init(c)
+
+#endif // NVRAM_V1_H__

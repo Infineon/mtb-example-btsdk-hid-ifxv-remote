@@ -20,15 +20,15 @@
 #endif
 
 #if HOST_TRACE
-# define HOST_TRACE        WICED_BT_TRACE
+# define APP_HOST_TRACE        WICED_BT_TRACE
 # if HOST_TRACE>1
-#  define HOST_TRACE2      WICED_BT_TRACE
+#  define APP_HOST_TRACE2      WICED_BT_TRACE
 # else
-#  define HOST_TRACE2(...)
+#  define APP_HOST_TRACE2(...)
 # endif
 #else
-# define HOST_TRACE(...)
-# define HOST_TRACE2(...)
+# define APP_HOST_TRACE(...)
+# define APP_HOST_TRACE2(...)
 #endif
 
 #define COMMIT_DELAY 1000     // 1 sec to commit
@@ -108,11 +108,11 @@ static struct
  *******************************************************************/
 static void host_commit_timer_cb( TIMER_PARAM_TYPE arg )
 {
-    HOST_TRACE("hidd_host commit to NVRAM");
+    APP_HOST_TRACE("hidd_host commit to NVRAM");
     // save host info to NVRAM
     if(!nvram_write( VS_ID_HIDD_HOST_LIST, (uint8_t *) host.list, HIDD_HOST_LIST_SIZE))
     {
-        HOST_TRACE("host info failed to commit to NVRAM");
+        APP_HOST_TRACE("host info failed to commit to NVRAM");
     }
 }
 
@@ -295,7 +295,7 @@ static wiced_bool_t host_activate(const wiced_bt_device_address_t bdAddr)
 
     if (index != HOST_INFO_INDEX_TOP)
     {
-        HOST_TRACE("new host %B", bdAddr);
+        APP_HOST_TRACE("new host %B", bdAddr);
 #if HIDD_HOST_LIST_MAX <= 1
         host.count=1;
 #else
@@ -313,7 +313,7 @@ static wiced_bool_t host_activate(const wiced_bt_device_address_t bdAddr)
         // now we make room at the top for the new host
         host_shift_down(HOST_INFO_INDEX_TOP);
 
-        HOST_TRACE("%s host %", found ? "Updating" : "Adding", bdAddr);
+        APP_HOST_TRACE("%s host %", found ? "Updating" : "Adding", bdAddr);
         if (found)
         {
             // restore original host info
@@ -351,11 +351,11 @@ uint16_t host_get_info(uint8_t * buf)
     uint16_t ofst = 0, idx;
     wiced_bool_t connected = host.count && link_is_connected();
 
-    HOST_TRACE("host_get_info count=%d link is %s", host.count, connected ? "up" : "down");
+    APP_HOST_TRACE("host_get_info count=%d link is %s", host.count, connected ? "up" : "down");
     buf[ofst++] = host.count | (connected ? 0x80 : 0);
     for (idx=0; idx<host.count; idx++)
     {
-        buf[ofst++] = (host.list[idx].transport==BT_TRANSPORT_BR_EDR) ? 0 : 0x80 | host.list[idx].bt.le.addrType;
+        buf[ofst++] = (host.list[idx].transport==BT_TRANSPORT_BR_EDR) ? 0 : (0x80 | host.list[idx].bt.le.addrType);
         memcpy(&buf[ofst], host.list[idx].bdAddr, BD_ADDR_LEN);
         ofst += BD_ADDR_LEN;
     }
@@ -369,18 +369,18 @@ uint16_t host_get_info(uint8_t * buf)
  * Summary:
  *  get a copy of active link key data
  ********************************************************************/
-wiced_bool_t host_get_link_key(const wiced_bt_device_address_t bdAddr, wiced_bt_device_link_keys_t * link_key)
+wiced_bt_device_link_keys_t * host_get_link_key(const wiced_bt_device_address_t bdAddr)
 {
     uint8_t index = host_findAddr(bdAddr);
 
-    if (index < HIDD_HOST_LIST_MAX && (link_key != NULL))
+    if (index < HIDD_HOST_LIST_MAX)
     {
-        HOST_TRACE("Found link key for %B", bdAddr);
-        memcpy(link_key, &host.list[index].link_keys, sizeof(wiced_bt_device_link_keys_t));
-        return TRUE;
+        if (memcmp(&host.list[index].link_keys.bd_addr, bdAddr, BD_ADDR_LEN) == 0)
+        {
+            return &host.list[index].link_keys;
+        }
     }
-    HOST_TRACE("No link key found for %B", bdAddr);
-    return FALSE;
+    return NULL;
 }
 
 /********************************************************************
@@ -397,7 +397,7 @@ void host_set_link_key(const wiced_bt_device_address_t bdAddr, wiced_bt_device_l
 {
     host_info_t * ptr = &host.list[HOST_INFO_INDEX_TOP];
 
-    HOST_TRACE("%s link key for %B", link_keys ? "Update":"Clear", bdAddr);
+    APP_HOST_TRACE("%s link key for %B", link_keys ? "Update":"Clear", bdAddr);
     host_activate(bdAddr);   // bdAddr host will be placed to the top (active host) of the host list
 
     if (link_keys)
@@ -433,10 +433,8 @@ void host_init()
     //timer to allow commit nvram write
     wiced_init_timer( &host.commitTimer, host_commit_timer_cb, 0, WICED_MILLI_SECONDS_TIMER );
 
-    HOST_TRACE("Host Init");
-#ifdef AUTO_PAIRING
-    host_update_to_nvram(0);  // Write to NVRAM with empty host info. This will clean up previous pairing.
-#else
+    APP_HOST_TRACE("Host Init");
+
     if (nvram_read(VS_ID_HIDD_HOST_LIST, (uint8_t *)host.list, HIDD_HOST_LIST_SIZE))
     {
         uint8_t index = 0;
@@ -448,7 +446,7 @@ void host_init()
             {
                 break;
             }
-            HOST_TRACE("%d. %B (%s host)",index, host.list[index].bdAddr, host.list[index].transport == BT_TRANSPORT_LE ? "LE" : "BR/EDR");
+            APP_HOST_TRACE("%d. %B (%s host)",index, host.list[index].bdAddr, host.list[index].transport == BT_TRANSPORT_LE ? "LE" : "BR/EDR");
             if (host.list[index].transport == BT_TRANSPORT_LE && host.list[index].bt.le.addrType)
             {
                 wiced_bt_dev_add_device_to_address_resolution_db ( &host.list[index].link_keys );
@@ -459,14 +457,13 @@ void host_init()
     }
     else
     {
-        HOST_TRACE("Host info not found in NVRAM");
+        APP_HOST_TRACE("Host info not found in NVRAM");
     }
 
     if( !host.count)
     {
-        HOST_TRACE("Host list empty");
+        APP_HOST_TRACE("Host list empty");
     }
-#endif
 }
 
 /***********************************************************
@@ -485,7 +482,7 @@ void host_set_cccd_flags(const wiced_bt_device_address_t bdAddr, uint16_t nflags
         host.list[HOST_INFO_INDEX_TOP].bt.le.notification_flags = nflags;
         host.list[HOST_INFO_INDEX_TOP].bt.le.indication_flags = iflags;
     }
-    HOST_TRACE("host set flags:%04x %04x", nflags, iflags);
+    APP_HOST_TRACE("host set flags:%04x %04x", nflags, iflags);
     host_update_to_nvram(COMMIT_DELAY);
 }
 
@@ -507,7 +504,7 @@ wiced_bool_t host_get_cccd_flags(const wiced_bt_device_address_t bdAddr,
     {
         *nflags = host.list[HOST_INFO_INDEX_TOP].bt.le.notification_flags;
         *iflags = host.list[HOST_INFO_INDEX_TOP].bt.le.indication_flags;
-        HOST_TRACE("host get flags: %04x, %04x", *nflags, *iflags);
+        APP_HOST_TRACE("host get flags: %04x, %04x", *nflags, *iflags);
         return TRUE;
     }
     return FALSE;
@@ -546,6 +543,7 @@ wiced_bool_t host_remove()
 {
     if (host.count)
     {
+        APP_HOST_TRACE("Removing host %B", host_addr());
         host_del(HOST_INFO_INDEX_TOP);
         host_update_to_nvram(COMMIT_DELAY);
         return TRUE;

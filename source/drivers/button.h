@@ -36,15 +36,17 @@
  * button Interface definitions
  *
  */
-#ifndef __BUTTON_H__
-#define __BUTTON_H__
+#ifndef BUTTON_H__
+#define BUTTON_H__
 
 // Button is supported only if the device is WICED_EVAL board
 #ifdef WICED_EVAL
  void button_init();
  wiced_bool_t button_down();
+ void button_check_boot_action();
 #else
  #define button_init()
+ #define button_check_boot_action()
 #endif
 
-#endif // __BUTTON_H__
+#endif // BUTTON_H__

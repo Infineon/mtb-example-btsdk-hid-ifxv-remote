@@ -31,13 +31,14 @@
  * so agrees to indemnify Cypress against all liability.
  */
 
-#pragma once
+#ifndef GATT_H__
+#define GATT_H__
 
 #include "gatt_v.h"
 #include "cycfg_gatt_db.h"
 
 #define HIDD_HANDLE_BEGIN  HDLS_HIDS
-#define HIDD_HANDLE_END    HDLC_HIDS_HID_CONTROL_POINT_VALUE
+#define HIDD_HANDLE_END    HDLD_HIDS_IN_RPT_USER_REPORT_REFERENCE
 #define is_hidd_handle(h)  ((h >= HIDD_HANDLE_BEGIN) && (h <= HIDD_HANDLE_END))
 
 #define BAS_HANDLE_BEGIN   HDLS_BAS
@@ -105,8 +106,4 @@ wiced_bt_gatt_status_t gatt_req_conf_handler( uint16_t conn_id, uint16_t handle 
 
 void gatt_register_congested_callback( gatt_congested_cb_t cb );
 
-
-#ifdef OTA_FIRMWARE_UPGRADE
-typedef void (*ota_fw_upgrade_status_callback_t)(uint8_t status);
-void register_ota_fw_upgrade_status_callback(ota_fw_upgrade_status_callback_t);
-#endif
+#endif // GATT_H__

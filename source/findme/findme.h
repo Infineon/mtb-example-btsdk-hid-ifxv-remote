@@ -30,36 +30,29 @@
  * of such system or application assumes all risk of such use and in doing
  * so agrees to indemnify Cypress against all liability.
  */
-#ifndef APP_BTSTACK_V1_H__
-#define APP_BTSTACK_V1_H__
 
-#include "wiced_bt_types.h"
-#include "cycfg_bt_settings.h"
-#include "wiced_hidd_lib.h"
+/** @file
+ *
+ * Bluetooth LE Remote find me
+ *
+ * This file provides definitions and function prototypes for LE remote find me functions
+ *
+ */
+#ifndef FINDME_H__
+#define FINDME_H__
 
-#define MAX_MTU_SIZE                     251
+#ifdef SUPPORT_FINDME
+#include "wiced.h"
+#include "wiced_bt_gatt.h"
 
-#define WICED_TIMER_PARAM_TYPE TIMER_PARAM_TYPE
+void findme_init(void);
+uint8_t findme_is_active(void);
+int findme_gatts_req_write_handler( uint16_t conn_id, wiced_bt_gatt_write_t * p_data );
 
-#ifdef WICED_EVAL
- #define RED_LED        WICED_PLATFORM_LED_2
- #define LINK_LED       WICED_PLATFORM_LED_1
 #else
- #ifdef RED_LED
-  #undef RED_LED
- #endif
- #define RED_LED        WICED_PLATFORM_LED_1
- #define LINK_LED       WICED_PLATFORM_LED_2
-#endif
+ #define findme_gatts_req_write_handler(id, data) WICED_BT_GATT_NOT_FOUND
+ #define findme_init()
+ #define findme_is_active() FALSE
+#endif // SUPPORT_FINDME
 
-#define cfg_sec_mask() ( wiced_bt_cfg_settings.security_requirement_mask )
-
-#define WICED_BTSTACK_VERSION_MAJOR WICED_SDK_MAJOR_VER
-#define WICED_BTSTACK_VERSION_MINOR WICED_SDK_MINOR_VER
-#define WICED_BTSTACK_VERSION_PATCH WICED_SDK_BUILD_NUMBER
-
-void hidd_enable_interrupt(wiced_bool_t en);
-
-wiced_bt_gatt_status_t app_gatt_read_req_handler( uint16_t conn_id, wiced_bt_gatt_read_t * p_read_data );
-
-#endif // APP_BTSTACK_V1_H__
+#endif // FINDME_H__

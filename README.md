@@ -4,6 +4,15 @@
 
 The IFX-Voice LE Remote Control sample application demonstrates audio capabilities using Infineon Voice over GATT Profile (VoGP) protocol. This application is used together with the IFX-Voice Host application. The Client Control host application is used to navigate the demonstration and audio playback.
 
+## WARNING: Sample 16-bit service UUID not for production use
+This application demonstrates the use of a custom GATT service using 16-bit service UUID 0x0000. This is not a valid service UUID and **MUST NOT BE USED IN A SHIPPING PRODUCT**. To use this code in a shipping product, users must purchase a valid 16-bit service UUID from the Bluetooth&#174; SIG, see https://support.bluetooth.com/hc/en-us/articles/360062030092-Requesting-Assigned-Numbers
+
+When a valid 16-bit service UUID is obtained, the source code in this Remote application must be modified to use it, change:
+
+`source/audio/protocol/COMPONENT_ifxv/design.cybt: <Property id="UUID" value="0000"/>`
+
+The IFX-Voice LE Host sample used in conjunction with this sample must also be modified to match the valid service UUID.
+
 ## Codec Supported
 
 - ADPCM
@@ -15,16 +24,20 @@ The IFX-Voice LE Remote Control sample application demonstrates audio capabiliti
 - Process command from ifxv-host to start audio.
 - Record MIC input and save to PCM raw data file.
 - Send a voice data file from ifxv-remote to ifxv-host.
-
+- Over the air firmware upgrade capability
+- IR capability
+- Immediate Alert (Findme) capability
 
 ## Supported BSP
 
 - CYW920835REF-RCU-01
 - CYW920835M2EVB-01
+- CYBLE-343072-EVAL-M2B
+- CYBLE-333074-EVAL-M2B
 
 ## Build, Program, and Launch Client Control
 
-1. Plug CYW920835REF-RCU-01 or CYW920835M2EVB-01 kit into your computer.
+1. Plug CYW920835REF-RCU-01, CYW920835M2EVB-01, CYBLE-343072-EVAL-M2B, or CYBLE-333074-EVAL-M2B kit into your computer.
 
 2. Build the firmware based on the BSP and download the application to the kit. If the device cannot be detected, it is possible the HCI-UART is opened by other applications such as Client Control. Make sure the port is closed and ready from firmware downloading. If the device still cannot be detected after closing the HCI-UART port, it could mean the firmware is corrupted and the device is not functional. In this case, the device needs to be factory reset with the recovery procedure. To perform recovery in CYW920835M2EVB-01, press and hold the recovery button (red), press the reset button (blue), and then release the recovery button.
 
@@ -34,11 +47,13 @@ The IFX-Voice LE Remote Control sample application demonstrates audio capabiliti
 
    ![Image](./images/ble_rcu_puart_small.jpg)
 
-3. Launch Client Control application and open the device HCI-UART port. The 'HID Device' tab should be activated and the audio group should show the device capability. The capabilities can be changed in application makefile when building the firmware. See [Application Settings](#application-settings) section below.
+3. Launch the Client Control application, choose 3000000 as the baud rate and select the serial port in Client Control tool window. The serial port should be the same port that was used to program the board.
+
+4. Press the reset button once after the port is opened to establish communication with Client Control. If SDS, Shut Down Sleep (SLEEP_ALLOW = 2), is configured in the build, a core-dump followed by a reset will show in log if the device has already entered SDS. After the communication is established, the 'HID Device' tab should be activated and the controls in the 'Audio' group should show the device capability. The capabilities can be changed in the application makefile when building the firmware. See Application Settings section below.
 
    ![Image](./images/ClientControl.jpg)
 
-4. Optionally, the PUART can be opened for console display. (115200, 8, N, 1, No Flow control)
+5. Optionally, the PUART can be opened for console display. (115200, 8, N, 1, No Flow control)
 
    ![Image](./images/puart.png)
 
@@ -70,7 +85,7 @@ After service discovery completes, both host and remote's LED turns solid on to 
 In CYW920835M2EVB-01, the digital MIC pins are shared with LEDs. When testing with DMIC, the slide switch SW4 must be shift to DMIC position. The LEDs are disabled when testing with DMIC.
 The CYW920835REF-RCU-01 does not have DMIC mounted. It is not capable for DMIC testing.
 
-1. Initiate live audio streaming from ifxv-remote.
+1. Initiate live audio streaming from ifxv-remote to ifxv-host.
 
    This is the most common usage that the user presses the audio button at the remote to start to voice audio streaming. The Client Control's 'Audio' button is the soft button, acting the same as the physical audio button in the remote if available. In CYW920835M2EVB-01, the user button is used for the audio button when the link is up. Press and hold the Audio button should start MIC voice audio streaming to the host. The Red LEDs should be turned solid on and the host Client Control file size starts to increment for the audio data received. After releasing the button, the audio streaming stops. The host Client Control saves the audio to the specified file and then playback the file just saved. Because of the LE bandwidth, without compression, this live audio streaming operation is not available if no CODEC is used.
 
@@ -94,6 +109,26 @@ The CYW920835REF-RCU-01 does not have DMIC mounted. It is not capable for DMIC t
 
    ![Image](./images/host-record.png)
 
+5. Erasing pairing information.
+
+   In any case, if the pairing data needs to be erased, use 'Virtual Unplug' button in Client Control to remove the pairing. When Client Control is not avaiable, the erasing pairing can by done by the buttons with the following sequence: While press and hold user (black) button, press reset (blue) button to reset the device. Continue to hold black button until the LED starts to do slow blink. The pairing data is erased and ready to be paired with a new host.
+
+## IR Testing
+
+If the physical IR button is not available, use Client Control 'IR' virtual button to send IR signal. For the BSPs that use CYW9BTM2BASE1 baseboard, such as CYW920835M2EVB-01, CYBLE-343072-EVAL-M2B or CYBLE-333074-EVAL-M2B, the IR signal can be probed on P38 which is mapped to J3 pin 2 (SDA).
+Do not enable IR for CYW920835REF-RCU-01 because P38 conflicts with battery monitoring on that BSP. Code would need to be changed to use another GPIO for IR on that BSP before enabling it.
+
+## Findme Testing
+
+Use the pull-down menu in Client Control to select and send alert level. The red LED should react to the alert level.
+
+## OTA Firmware Upgrade
+
+This application supports OTA Firmware Upgrade. To update the application, see the readme in wiced\_btsdk\tools\btsdk-peer-apps-ota.
+
+## SDS (Shut Down Sleep)
+
+When the sleep mode is set to SLEEP_ALLOWED=2, SDS is enabled. When in SDS, the device is powered down. Any event, such as GPIO event or Bluetooth link events can wake up the device to resume the activity. The power consumption current can be measured with VBAT power source, J8, between pin 2 and 3 in the baseboard. The testing showing abut 1 uA when the device is in SDS with CYW920835M2EVB-01 radio module. The reading was higher with CYBLE-343072-EVAL-M2B radio module.
 
 # Application Settings
 See the application makefile for details about these make variables.
@@ -107,6 +142,20 @@ See the application makefile for details about these make variables.
    SLEEP_ALLOWED=0  Disable sleep function
    SLEEP_ALLOWED=1  Allow sleep without shutdown
    SLEEP_ALLOWED=2  Allow sleep with shutdown
+   ~~~
+
+- OTA\_FW\_UPGRADE=n
+
+   ~~~
+   OTA_FW_UPGRADE=0  Disable OTA firmware upgrade feature
+   OTA_FW_UPGRADE=1  Build with OTA firmware upgrade feature
+   ~~~
+
+- OTA\_SEC\_FW\_UPGRADE=n
+
+   ~~~
+   OTA_SEC_FW_UPGRADE=0  Disable secure OTA firmware upgrade feature
+   OTA_SEC_FW_UPGRADE=1  Use this option for secure OTA firmware upgrade, this flag is valid only when OTA_FW_UPGRADE is enabled. The ecdsa256_public_key content should be updated with the generated key in file ecdsa256_pub.c.
    ~~~
 
 - LED=n
@@ -135,6 +184,55 @@ See the application makefile for details about these make variables.
    ~~~
    PDM=0             Analog MIC
    PDM=1             Digital MIC
+   ~~~
+
+- AUTO\_RECONNECT=n
+
+   ~~~
+   AUTO_RECONNECT=0  Does nothing when link is down
+   AUTO_RECONNECT=1  Automatically reconnect when connection drops
+   ~~~
+
+- START\_ADV\_ON\_POWERUP=n
+
+   ~~~
+   START_ADV_ON_POWERUP=0  Does nothing on power up
+   START_ADV_ON_POWERUP=1  Start advertising on power up. If paired it reconnect when power up
+   ~~~
+
+- ENABLE\_CONNECTED\_ADV=n
+
+   ~~~
+   ENABLE_CONNECTED_ADV=0  Does not allow advertisement when link is connected
+   ENABLE_CONNECTED_ADV=1  Allow advertisement when link is connected
+   ~~~
+
+- ENDLESS\_ADV=n
+
+   ~~~
+   ENDLESS_ADV=0  Advertisement expires in the time specified the configuration
+   ENDLESS_ADV=1  Advertisement does not expire
+   ~~~
+
+- LE\_LOCAL\_PRIVACY=n
+
+   ~~~
+   LE_LOCAL_PRIVACY=0  Use public address
+   LE_LOCAL_PRIVACY=1  Use random private address
+   ~~~
+
+- ENABLE\_IR=n
+
+   ~~~
+   ENABLE_IR=0  Disable IR capability
+   ENABLE_IR=1  Enable IR capability
+   ~~~
+
+- ENABLE\_FINDME=n
+
+   ~~~
+   ENABLE_FINDME=0  Disable Findme capability
+   ENABLE_FINDME=1  Enable Findme capability
    ~~~
 
 ## BTSTACK version

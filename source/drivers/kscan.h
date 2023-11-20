@@ -36,8 +36,8 @@
  * Keyscan Interface definitions
  *
  */
-#ifndef __KEYSCAN_H__
-#define __KEYSCAN_H__
+#ifndef KEYSCAN_H__
+#define KEYSCAN_H__
 
 #ifdef SUPPORT_KEYSCAN
 #include "wiced.h"
@@ -131,4 +131,4 @@ void kscan_reset(void);
  #define kscan_is_any_key_pressed() FALSE
  #define keyscanActive() FALSE
 #endif // SUPPORT_KEYSCAN
-#endif // __KEYSCAN_H__
+#endif // KEYSCAN_H__

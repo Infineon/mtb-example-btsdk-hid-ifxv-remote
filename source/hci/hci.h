@@ -36,8 +36,8 @@
  * HCI hidd handling routines
  *
  */
-#ifndef __BLE_HID_HCI_H__
-#define __BLE_HID_HCI_H__
+#ifndef BLE_HID_HCI_H__
+#define BLE_HID_HCI_H__
 
 typedef unsigned char uint8_t;
 typedef unsigned short uint16_t;

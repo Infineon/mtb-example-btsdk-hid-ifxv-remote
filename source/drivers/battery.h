@@ -37,8 +37,8 @@
  *
  */
 
-#ifndef __APP_BATTERY_H__
-#define __APP_BATTERY_H__
+#ifndef APP_BATTERY_H__
+#define APP_BATTERY_H__
 
 #ifdef BATTERY_REPORT_SUPPORT
 #include "wiced.h"
@@ -92,4 +92,4 @@ void bat_init(void (shutdown_cb)());
 # define bat_init(c)
 # define bat_poll()
 #endif
-#endif // __APP_BATTERY_H__
+#endif // APP_BATTERY_H__

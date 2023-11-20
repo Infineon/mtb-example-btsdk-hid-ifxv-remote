@@ -40,8 +40,8 @@
 * Functions:
 *
 *******************************************************************************/
-#ifndef __HIDD_LIB_LED_H__
-#define __HIDD_LIB_LED_H__
+#ifndef HIDD_LIB_LED_H__
+#define HIDD_LIB_LED_H__
 #include "wiced_platform.h"
 
 // Use first defined LED for HIDD code indicator
@@ -179,16 +179,38 @@ enum {
  *******************************************************************************/
  void led_blink_stop(uint8_t idx);
 
- // PWM functions are not implemented yet
- #ifdef LED_USE_PWM
- void hidd_pwm_led_init(uint8_t idx, uint8_t off_level);
- void hidd_pwm_led_on(uint8_t idx, uint8_t percent);
- void hidd_pwm_led_off(uint8_t idx);
- #else
- #define hidd_pwm_led_init(idx, off_level)
- #define hidd_pwm_led_on(idx, percent)
- #define hidd_pwm_led_off(idx)
+ #if is_SDS_capable && (SLEEP_ALLOWED > 1)
+/*******************************************************************************
+ * Function Name: led_get_state
+ ********************************************************************************
+ * Summary:
+ *    This function is called before entering SDS. It returns all LED states
+ *
+ * Parameters:
+ *    none
+ *
+ * Return:
+ *    LED states
+ *
+ *******************************************************************************/
+ uint8_t led_get_states();
+
+/*******************************************************************************
+ * Function Name: led_set_state
+ ********************************************************************************
+ * Summary:
+ *    This function is called when waking up from SDS. It restores LED states
+ *
+ * Parameters:
+ *    All led states
+ *
+ * Return:
+ *    none
+ *
+ *******************************************************************************/
+ void led_set_states(uint8_t state);
  #endif
+
 #else
  #define led_is_blinking(idx) FALSE
  #define led_init(cnt,cfg)
@@ -197,8 +219,10 @@ enum {
  #define led_blink(idx, count, how_fast_in_ms)
  #define led_blink_code(idx, code)
  #define led_blink_stop(idx)
+ #define led_get_states() 0
+ #define led_set_states(n)
  #define hidd_pwm_led_init(idx, off_level)
  #define hidd_pwm_led_on(idx, percent)
  #define hidd_pwm_led_off(idx)
 #endif // LED_SUPPORT
-#endif // __HIDD_LIB_LED_H__
+#endif // HIDD_LIB_LED_H__

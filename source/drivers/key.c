@@ -414,11 +414,20 @@ wiced_bool_t key_event(uint8_t keyCode, uint8_t keyDown)
  *******************************************************************************/
 wiced_bool_t key_process_event(uint8_t keyCode, uint8_t keyDown)
 {
+#ifdef SUPPORT_IR
+    if (ir_button(keyCode, keyDown))
+    {
+        // If the button is an IR button, it is handled insided of ir_button function. Nothing to do in this layer.
+    }
+    else
+#endif
+#ifdef SUPPORT_AUDIO
     if (keyCode == AUDIO_KEY_INDEX)
     {
         audio_button(keyDown);
     }
     else
+#endif
     {
         return key_event(keyCode, keyDown);
     }

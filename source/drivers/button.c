@@ -72,4 +72,12 @@ void button_init()
     wiced_platform_register_button_callback( WICED_PLATFORM_BUTTON_1, button_interrupt_handler, NULL, WICED_PLATFORM_BUTTON_BOTH_EDGE);
 }
 
+void button_check_boot_action()
+{
+    if (button_down())
+    {
+        button_interrupt_handler(NULL, 0); // take action
+    }
+}
+
 #endif // WICED_EVAL

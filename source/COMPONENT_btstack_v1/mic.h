@@ -39,8 +39,8 @@
  * device
  *
  */
-#ifndef __APP_MIC_H__
-#define __APP_MIC_H__
+#ifndef APP_MIC_H__
+#define APP_MIC_H__
 
 //typedef uint16_t pcm_data_t;
 //typedef void (pcm_data_available_cb_t) (pcm_data_t * pcm_data, uint16_t cnt);
@@ -50,4 +50,4 @@ void mic_stop(void);
 void mic_start(void);
 void mic_init(activity_detected_cb_t cb);
 
-#endif // __APP_MIC_H__
+#endif // APP_MIC_H__

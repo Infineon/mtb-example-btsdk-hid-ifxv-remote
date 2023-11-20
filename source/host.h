@@ -11,7 +11,8 @@
  * device address, link key, client configuration characteristic descriptor value
  */
 
-#pragma once
+#ifndef HOST_H__
+#define HOST_H__
 
 #include "wiced_bt_dev.h"
 
@@ -37,11 +38,11 @@ uint16_t host_get_info(uint8_t * buf);
  * Function Name: host_get_link_key
  ********************************************************************
  * Summary:
- *  get a copy of active link key data
+ *  get a link key data
  *
- * Return FALSE if bdaddr does not match
+ * Return NULL if bdaddr is not bonded
  ********************************************************************/
-wiced_bool_t host_get_link_key(const wiced_bt_device_address_t bdAddr, wiced_bt_device_link_keys_t * link_key);
+wiced_bt_device_link_keys_t * host_get_link_key(const wiced_bt_device_address_t bdAddr);
 
 /********************************************************************
  * Function Name: host_set_link_key
@@ -204,5 +205,5 @@ uint8_t host_addr_type();
  ***********************************************************/
 wiced_bt_transport_t host_transport();
 
-
+#endif // HOST_H__
 /* end of file */

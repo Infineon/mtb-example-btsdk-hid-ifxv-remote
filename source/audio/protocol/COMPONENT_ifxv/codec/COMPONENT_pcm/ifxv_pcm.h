@@ -34,7 +34,8 @@
 /** @file
  *
  */
-#pragma once
+#ifndef IFXV_PCM_H__
+#define IFXV_PCM_H__
 
 #define AUDIO_CODEC_CAPABILITY          IFX_AUDIO_CFG_CODEC_NONE
 #define AUDIO_DEVICE_CODEC              IFX_AUDIO_CFG_CODEC_NONE
@@ -63,3 +64,5 @@
 void     ifxv_pcm_init();
 uint16_t ifxv_pcm_encode(int16_t * p_pcm, uint16_t sample_cnt, uint8_t * p_frame);
 uint16_t ifxv_pcm_decode(uint8_t * p_frame, uint16_t sample_cnt, int16_t * p_pcm);
+
+#endif // IFXV_PCM_H__

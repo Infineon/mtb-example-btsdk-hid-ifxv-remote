@@ -34,7 +34,8 @@
 /** @file
  *
  */
-#pragma once
+#ifndef IFXV_OPUS_H__
+#define IFXV_OPUS_H__
 
 #include "celt_encoder_api.h"
 #ifdef CODEC_DECODE_SUPPORT
@@ -74,3 +75,5 @@
 void     ifxv_opus_init();
 uint16_t ifxv_opus_encode(int16_t * p_pcm, uint16_t sample_cnt, uint8_t * p_pkt);
 uint16_t ifxv_opus_decode(uint8_t * p_pkt, uint16_t sample_cnt, int16_t * p_pcm);
+
+#endif // IFXV_OPUS_H__

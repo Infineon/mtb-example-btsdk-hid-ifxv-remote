@@ -36,8 +36,8 @@
  * Keyscan Interface definitions
  *
  */
-#ifndef __KEY_H__
-#define __KEY_H__
+#ifndef KEY_H__
+#define KEY_H__
 
 #include "wiced.h"
 #include "hidevent.h"
@@ -240,4 +240,4 @@ void key_sendRollover();
  #define key_setReport(t,r,p,s) FALSE
 
 #endif // SUPPORT_KEY_REPORT
-#endif // __KEY_H__
+#endif // KEY_H__

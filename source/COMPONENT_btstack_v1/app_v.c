@@ -58,7 +58,7 @@ wiced_bt_gatt_status_t app_gatt_read_req_handler( uint16_t conn_id, wiced_bt_gat
     // if read request is for the OTA FW upgrade service, pass it to the library to process
     if (wiced_ota_fw_upgrade_is_gatt_handle(p_read_data->handle))
     {
-//        WICED_BT_TRACE("OTA req_read_handler %04x", p_read_data->handle );
+        WICED_BT_TRACE("OTA Read - handle:%04x", p_read_data->handle );
         return wiced_ota_fw_upgrade_read_handler(conn_id, p_read_data);
     }
     else

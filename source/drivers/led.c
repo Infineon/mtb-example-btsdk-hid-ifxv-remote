@@ -42,8 +42,8 @@
 #if LED_SUPPORT
 #include "wiced_bt_trace.h"
 #include "wiced_timer.h"
-#include "led.h"
 #include "wiced_hal_mia.h"
+#include "app.h"
 
 #define BLINK_CODE_SPEED 500
 #define ERROR_CODE_BLINK_BREAK      4000
@@ -143,6 +143,59 @@ static void LED_set(uint8_t idx, wiced_bool_t on_off)
         }
     }
 }
+
+#if is_SDS_capable && (SLEEP_ALLOWED > 1)
+/*******************************************************************************
+ * Function Name: led_get_states
+ ********************************************************************************
+ * Summary:
+ *    This function is called before entering SDS. It returns all LED states
+ *
+ * Parameters:
+ *    none
+ *
+ * Return:
+ *    LED states
+ *
+ *******************************************************************************/
+uint8_t led_get_states()
+{
+    uint8_t state=0;
+
+    // initialize LED based on platform defines
+    for (int idx=0;idx<led_cfg.count;idx++)
+    {
+        if (led[idx].state)
+        {
+            state |= (1<<idx);
+        }
+    }
+    return state;
+}
+
+/*******************************************************************************
+ * Function Name: led_set_states
+ ********************************************************************************
+ * Summary:
+ *    This function is called when waking up from SDS. It restores LED states
+ *
+ * Parameters:
+ *    All led states
+ *
+ * Return:
+ *    none
+ *
+ *******************************************************************************/
+void led_set_states(uint8_t state)
+{
+    // set led states
+    for (int idx=0;idx<led_cfg.count;idx++)
+    {
+        led[idx].state = state & (1<<idx) ? 1 : 0;
+        LED_setState(idx, led[idx].state);
+    }
+}
+#endif
 
 /*******************************************************************************
  * Function Name: led_is_blinking
@@ -312,8 +365,6 @@ void led_init(uint8_t count, const wiced_platform_led_config_t * cfg)
             if (wiced_hal_mia_is_reset_reason_por())
             {
                 APP_LED_TRACE("LED%d: GPIO:%d CFG:%04x default:%d", idx, *cfg[idx].gpio, cfg[idx].config, cfg[idx].default_state);
-                // pin initialization is done in platform.c
-//                wiced_hal_gpio_configure_pin(*cfg[idx].gpio, cfg[idx].config, cfg[idx].default_state);
                 LED_set(idx, LED_OFF); // default to turn LED off
             }
             wiced_hal_gpio_slimboot_reenforce_cfg(*led_cfg.platform[idx].gpio, GPIO_OUTPUT_ENABLE);

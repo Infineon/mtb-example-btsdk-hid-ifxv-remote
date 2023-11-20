@@ -38,7 +38,8 @@
 * The (default) microphone uses on-chip Audio ADC.
 */
 
-#pragma once
+#ifndef AUDIO_V1_H__
+#define AUDIO_V1_H__
 
 #include "adc.h"
 #include "audio_types.h"
@@ -302,3 +303,5 @@ void mic_assign_mic_pdm_pins(uint8_t clk, uint8_t data);
 /// \return none
 ////////////////////////////////////////////////////////////////////////////////
 void mic_set_codec_sampling_freq(uint8_t freq);
+
+#endif // AUDIO_V1_H__

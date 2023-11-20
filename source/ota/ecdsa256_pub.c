@@ -30,36 +30,17 @@
  * of such system or application assumes all risk of such use and in doing
  * so agrees to indemnify Cypress against all liability.
  */
-#ifndef APP_BTSTACK_V1_H__
-#define APP_BTSTACK_V1_H__
 
-#include "wiced_bt_types.h"
-#include "cycfg_bt_settings.h"
-#include "wiced_hidd_lib.h"
+#ifdef OTA_SECURE_FIRMWARE_UPGRADE
+#include <bt_types.h>
+#include <p_256_ecc_pp.h>
 
-#define MAX_MTU_SIZE                     251
+// The ecdsa256_public_key should be replaced with the geneerated secure OTA public key when building the code
 
-#define WICED_TIMER_PARAM_TYPE TIMER_PARAM_TYPE
-
-#ifdef WICED_EVAL
- #define RED_LED        WICED_PLATFORM_LED_2
- #define LINK_LED       WICED_PLATFORM_LED_1
-#else
- #ifdef RED_LED
-  #undef RED_LED
- #endif
- #define RED_LED        WICED_PLATFORM_LED_1
- #define LINK_LED       WICED_PLATFORM_LED_2
-#endif
-
-#define cfg_sec_mask() ( wiced_bt_cfg_settings.security_requirement_mask )
-
-#define WICED_BTSTACK_VERSION_MAJOR WICED_SDK_MAJOR_VER
-#define WICED_BTSTACK_VERSION_MINOR WICED_SDK_MINOR_VER
-#define WICED_BTSTACK_VERSION_PATCH WICED_SDK_BUILD_NUMBER
-
-void hidd_enable_interrupt(wiced_bool_t en);
-
-wiced_bt_gatt_status_t app_gatt_read_req_handler( uint16_t conn_id, wiced_bt_gatt_read_t * p_read_data );
-
-#endif // APP_BTSTACK_V1_H__
+// public key
+Point ecdsa256_public_key =
+{
+    { 0xb34eacf0, 0x3ec9a058, 0x9de3c962, 0x6f21ae8a, 0x0d0b3967, 0x30e901b3, 0x1b2b1931, 0x6b462309, },
+    { 0x21ec2ce7, 0x3f5dbaad, 0x887b63a3, 0xed6cb229, 0x049d0642, 0xd2358dab, 0x69a2b20b, 0xc71e1d03, },
+};
+#endif // OTA_SECURE_FIRMWARE_UPGRADE

@@ -34,7 +34,8 @@
 /** @file
  *
  */
-#pragma once
+#ifndef IFXV_CODEC_H__
+#define IFXV_CODEC_H__
 
 #include "ifxv_adpcm.h"
 
@@ -45,3 +46,5 @@
 #define codec_init()                                                        // Start up one time init.
 #define codec_encode(pcm, cnt, frame)   ifxv_adpcm_encode(pcm, cnt, frame)
 #define codec_decode(frame, cnt, pcm)   ifxv_adpcm_decode(frame, cnt, pcm)
+
+#endif // IFXV_CODEC_H__

@@ -39,7 +39,8 @@
  * device
  *
  */
-#pragma once
+#ifndef AUDIO_H__
+#define AUDIO_H__
 
 #include "protocol.h"
 #include "codec.h"
@@ -75,3 +76,5 @@ wiced_bool_t audio_data_from_hci(void);
 #define is_audio_handle(h)             is_protocol_handle(h)
 #define audio_gatt_read_handler(i,d)   protocol_gatt_write_handler(i, d)
 #define audio_gatt_write_handler(i,d)  protocol_write_handler(i, d)
+
+#endif // AUDIO_H__

@@ -9,8 +9,10 @@
  * isoc_hidh, HID Host, for the demo.
  *
  */
-#pragma once
+#ifndef APP_H__
+#define APP_H__
 
+#include "hidd_lib.h"
 #include "wiced_bt_trace.h"
 #include "hci_control_api.h"
 #include "bt.h"
@@ -21,10 +23,14 @@
 #include "button.h"
 #include "battery.h"
 #include "key.h"
-#include "hidd_lib.h"
 #include "hci.h"
 #include "audio.h"
 #include "app_v.h"
+#include "ota.h"
+#include "ir.h"
+#include "findme.h"
+#include "sds.h"
+#include "nvram.h"
 
 #ifdef WICED_EVAL
  #define RED_LED        WICED_PLATFORM_LED_2
@@ -34,20 +40,26 @@
  #define LINK_LED       WICED_PLATFORM_LED_2
 #endif
 
+#define CONNECT_KEY_INDEX  0
 #define AUDIO_KEY_INDEX    1
 #define HOME_KEY_INDEX     13
 #define BACK_KEY_INDEX     14
+#define IR_KEY_INDEX       17
 #define MUTE_KEY_INDEX     20
 
 #define NUM_KEYSCAN_ROWS   3  // Num of Rows in keyscan matrix
 #define NUM_KEYSCAN_COLS   7  // Num of Cols in keyscan matrix
 #define NUM_MAX_KEY (NUM_KEYSCAN_ROWS*NUM_KEYSCAN_COLS)
-#define CONNECT_KEY_INDEX  0  // Use none exist key as a virtual connect key
-#define AUDIO_KEY_INDEX    1
 
 #define CONNECT_INDEX       13 // HOME button hold for 10 sec to enter pairing
 #define CONNECT_COMBO       (1<<CONNECT_INDEX)   // CONNECT COMBO BITS
 #define CONNECT_COMBO_HOLD_TIME 10               // Hold for 10 sec.
+
+#ifdef SUPPORT_KEYSCAN
+ #define key_active() keyscanActive()
+#else
+ #define key_active() button_down()
+#endif
 
 /*******************************************************************************
  * macros
@@ -223,3 +235,5 @@ wiced_result_t app_init(void);
  *
  ********************************************************************/
 void application_start( void );
+
+#endif // APP_H__
