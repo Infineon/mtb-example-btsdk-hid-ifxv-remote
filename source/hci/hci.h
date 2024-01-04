@@ -81,6 +81,7 @@ uint32_t hci_dev_handle_command( uint8_t * p_data, uint32_t length );
  #define hci_control_send_state_change( transport, state )
  #define hci_control_send_data( code, buf, len )
  #define hci_control_register_key_handler( handler )
+ #define hci_control_send_audio_data_req()
  #ifdef HCI_TRACES_ENABLED
   void hci_control_enable_trace();
  #else

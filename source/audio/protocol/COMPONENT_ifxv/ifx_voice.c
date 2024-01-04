@@ -291,6 +291,7 @@ wiced_bt_gatt_status_t ifxv_gatts_req_write_callback(uint16_t conn_id, wiced_bt_
                 !IFXV_verify_capability(ifxv.host_capability.sample_frequency, "SampleRate", 2, freq_str))
             {
                 result = WICED_BT_GATT_INVALID_CFG;
+                break;
             }
 
             if (ifxv.host_capability.streaming_limit_in_sec)

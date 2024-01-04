@@ -146,7 +146,7 @@ static void sds_timer_restore_from_aon()
 
     for (int i=0; i<MAX_SDS_TIMER; i++)
     {
-        if (aon_data.timer_running & (i<<1))
+        if (aon_data.timer_running & (1<<i))
         {
             uint64_t time_passed_in_ms = (clock_SystemTimeMicroseconds64() - aon_data.timer[i].start_clock_in_us)/1000;
 
@@ -328,6 +328,11 @@ void sds_restore_data_from_aon()
 
     // restore cccd flags
     hidd_set_cccd_flags( aon_data.nflags, aon_data.iflags );
+
+    if (link_is_connected())
+    {
+        hidd_set_conn_id(link_conn_id());
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////

@@ -52,14 +52,14 @@
 // Bit defines
 enum bitmapped_key
 {
-    BITMAP_AC_SEARCH,   //#0, Voice
-    BITMAP_AC_HOME,     //#1, Home
-    BITMAP_AC_BACK,     //#2, Back
-    BITMAP_FAST_FORWD,  //#3, Forward
-    BITMAP_PLAY_PAUSE,  //#4, Play/Pause
-    BITMAP_REWIND,      //#5, Rewind
-    BITMAP_MENU,        //#6, Menu
-    BITMAP_MENU_ESC,    //#7, Menu ESC
+    BITMAP_AC_SEARCH,       //#0, Voice
+    BITMAP_AC_HOME,         //#1, Home
+    BITMAP_AC_BACK,         //#2, Back
+    BITMAP_FAST_FORWD,      //#3, Forward
+    BITMAP_PLAY_PAUSE,      //#4, Play/Pause
+    BITMAP_REWIND,          //#5, Rewind
+    BITMAP_MENU,            //#6, Menu
+    BITMAP_AL_AUDIO_PLAYER, //#7, Music
 
     BITMAP_MAX,
 };

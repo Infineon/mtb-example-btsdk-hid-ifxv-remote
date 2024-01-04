@@ -109,6 +109,35 @@ enum KeyType
 *****************************************************************************/
 KbKeyConfig kbKeyConfig[] =
 {
+#if CUSTOM_KEY_MATRIX == 1
+    // Matrix 5x3 --> Col:5(0..4) Row:3(0..2)
+
+    // Column 0:  order is row0 -> row2
+    {KEY_TYPE_BIT_MAPPED,   BITMAP_AC_SEARCH},      //#0, Voice
+    {KEY_TYPE_STD,          USB_USAGE_RIGHT_ARROW}, //#1, Right
+    {KEY_TYPE_STD,          USB_USAGE_UP_ARROW},    //#2, Up
+
+    // Column 1: order is row0 -> row2
+    {KEY_TYPE_STD,          USB_USAGE_LEFT_ARROW},  //#3, Left
+    {KEY_TYPE_STD,          USB_USAGE_ENTER},       //#4, Select
+    {KEY_TYPE_STD,          USB_USAGE_DOWN_ARROW},  //#5, Down
+
+    // Column 2: order is row0 -> row2
+    {KEY_TYPE_BIT_MAPPED,   BITMAP_AC_BACK},        //#6, Back
+    {KEY_TYPE_BIT_MAPPED,   BITMAP_PLAY_PAUSE},     //#7, Play/Pause
+    {KEY_TYPE_STD,          USB_USAGE_MUTE},        //#8, Mute
+
+    // Column 3: order is row0 -> row2
+    {KEY_TYPE_BIT_MAPPED,   BITMAP_AC_HOME},        //#9, Home
+    {KEY_TYPE_STD,          USB_USAGE_VOL_UP},      //#10, Vol Up
+    {KEY_TYPE_STD,          USB_USAGE_VOL_DOWN},    //#11, Vol Down
+
+    // Column 4: order is row0 -> row2
+    {KEY_TYPE_BIT_MAPPED,   BITMAP_MENU},           //#12, Menu
+    {KEY_TYPE_BIT_MAPPED,   BITMAP_AL_AUDIO_PLAYER},//#13, Menu
+    {KEY_TYPE_NONE,         0},                     //#14, n/c
+
+#else
     // Matrix 7x3 --> Col:7(0..6) Row:3(0..2)
 
     // Column 0:  order is row0 -> row2
@@ -145,7 +174,7 @@ KbKeyConfig kbKeyConfig[] =
     {KEY_TYPE_STD,          USB_USAGE_VOL_DOWN},    //#18, Vol Down
     {KEY_TYPE_STD,          USB_USAGE_VOL_UP},      //#19, Vol Up
     {KEY_TYPE_STD,          USB_USAGE_MUTE},        //#20, Mute
-
+#endif
 };
 
 #define KEY_TABLE_SIZE (sizeof(kbKeyConfig)/sizeof(KbKeyConfig))
@@ -360,7 +389,6 @@ static void KeyRpt_procEvtUserDefinedKey(uint8_t down, uint8_t translationCode)
  *******************************************************************************/
 wiced_bool_t key_event(uint8_t keyCode, uint8_t keyDown)
 {
-    WICED_BT_TRACE("%s  code=%d, upDown=%d", __FUNCTION__, keyCode, keyDown);
     // Check if we have a valid key
     if (keyCode < KEY_TABLE_SIZE)
     {

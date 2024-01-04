@@ -53,7 +53,7 @@ CONFIG=Debug
 VERBOSE=
 
 # default target
-TARGET=CYW920835M2EVB-01
+TARGET=CYW920835REF-RCU-01
 
 SUPPORTED_TARGETS = \
     CYW920835M2EVB-01 \
@@ -146,7 +146,6 @@ OTA_SEC_FW_UPGRADE?=0
 # CODEC=XXXX
 #    - Use this option to enable audio codec. The AUDIO option must be enabled for this option to take effect. Where XXXX is:
 #
-#      -            leave it empty or not to define to disable codec (Data will be sent as PCM raw data. This option is not capable for live audio streaming.)
 #      - OPUS       use OPUS CELT encoder
 #      - ADPCM      use ADPCM encoder
 #
@@ -184,11 +183,11 @@ PDM?=0
 #   Use LE_LOCAL_PRIVACY=1 to advertise with Resolvable Private Address (RPA)
 #
 SKIP_PARAM_UPDATE?=0
-AUTO_RECONNECT?=0
+AUTO_RECONNECT?=1
 START_ADV_ON_POWERUP?=1
-ENABLE_CONNECTED_ADV?=0
-ENDLESS_ADV?=0
-LE_LOCAL_PRIVACY=1
+ENABLE_CONNECTED_ADV?=1
+ENDLESS_ADV?=1
+LE_LOCAL_PRIVACY=0
 
 ####################################################
 # Use ENABLE_IR=1 to enable IR support.
@@ -197,7 +196,7 @@ LE_LOCAL_PRIVACY=1
 # It can cause battery monitor malfunction and wrongfully to shutdown the device.
 # To enable it, please change the code to use other GPIO.
 #
-ENABLE_IR?=0
+ENABLE_IR?=1
 
 ####################################################
 # Use ENABLE_FINDME=1 to enable Find Me profile support
@@ -228,13 +227,17 @@ ifeq ($(filter $(TARGET), CYW920835REF-RCU-01),)
  CY_APP_DEFINES += -DWICED_EVAL
 else
  CY_APP_DEFINES += -DSUPPORT_KEYSCAN
+ # When DCUSTOM_KEY_MATRIX is not defined or defined as 0, the key matrix is 3x7 for CYW920835REF-RCU-01 hardware.
+ # When defined as 1, the key matrix will be using custom 3x5
+# CY_APP_DEFINES += -DCUSTOM_KEY_MATRIX=1
 endif
 
 ifeq ($(OTA_FW_UPGRADE),1)
  # DEFINES
  CY_APP_DEFINES += -DOTA_FIRMWARE_UPGRADE
  CY_APP_DEFINES += -DDISABLED_PERIPHERAL_LATENCY_ONLY
-# OTA_SKIP_CONN_PARAM_UPDATE - when enabled, it will use the current connection parameter. When not defined, the OTA libraray will use 7.5 ms interval, makes data transfer much faster.
+# OTA_SKIP_CONN_PARAM_UPDATE - When enabled, it will use the current connection parameter for OTA.
+#                              When not defined, the OTA libraray will use 7.5 ms interval, makes data transfer much faster.
 # CY_APP_DEFINES += -DOTA_SKIP_CONN_PARAM_UPDATE
  ifeq ($(OTA_SEC_FW_UPGRADE), 1)
   CY_APP_DEFINES += -DOTA_SECURE_FIRMWARE_UPGRADE

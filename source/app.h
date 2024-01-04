@@ -5,8 +5,7 @@
 /**
  * file app.h
  *
- * This is the HID over ISOC demo application for HID Device. This application should be used together with
- * isoc_hidh, HID Host, for the demo.
+ * This is the application for IFXV-Device. This application should be used tested with IFX-Voice supported host.
  *
  */
 #ifndef APP_H__
@@ -41,17 +40,30 @@
 #endif
 
 #define CONNECT_KEY_INDEX  0
-#define AUDIO_KEY_INDEX    1
-#define HOME_KEY_INDEX     13
-#define BACK_KEY_INDEX     14
-#define IR_KEY_INDEX       17
-#define MUTE_KEY_INDEX     20
 
-#define NUM_KEYSCAN_ROWS   3  // Num of Rows in keyscan matrix
-#define NUM_KEYSCAN_COLS   7  // Num of Cols in keyscan matrix
+#if CUSTOM_KEY_MATRIX == 1
+ #define NUM_KEYSCAN_ROWS   3  // Num of Rows in keyscan matrix
+ #define NUM_KEYSCAN_COLS   5  // Num of Cols in keyscan matrix
+
+ #define AUDIO_KEY_INDEX    0
+ #define HOME_KEY_INDEX     9
+ #define BACK_KEY_INDEX     6
+ #define IR_KEY_INDEX       14 // Doesn't exists, use NC key index
+ #define MUTE_KEY_INDEX     8
+#else
+ #define NUM_KEYSCAN_ROWS   3  // Num of Rows in keyscan matrix
+ #define NUM_KEYSCAN_COLS   7  // Num of Cols in keyscan matrix
+
+ #define AUDIO_KEY_INDEX    1
+ #define HOME_KEY_INDEX     13
+ #define BACK_KEY_INDEX     14
+ #define IR_KEY_INDEX       17
+ #define MUTE_KEY_INDEX     20
+#endif
+
+#define CONNECT_INDEX       HOME_KEY_INDEX // HOME button hold for 10 sec to enter pairing
 #define NUM_MAX_KEY (NUM_KEYSCAN_ROWS*NUM_KEYSCAN_COLS)
 
-#define CONNECT_INDEX       13 // HOME button hold for 10 sec to enter pairing
 #define CONNECT_COMBO       (1<<CONNECT_INDEX)   // CONNECT COMBO BITS
 #define CONNECT_COMBO_HOLD_TIME 10               // Hold for 10 sec.
 

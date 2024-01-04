@@ -40,6 +40,7 @@
 #ifdef SUPPORT_KEYSCAN
 
 #include "app.h"
+#include "wiced_hal_mia.h"
 
 #if CHIP!=20829 && defined WICED_BT_TRACE_ENABLE
 # undef WICED_BT_TRACE
@@ -65,6 +66,9 @@ static kscan_data_t ks = {0};
 /////////////////////////////////////////////////////////////////////////////////
 static void kscan_pollEvent(void * userData)
 {
+    // Poll the hardware for events
+    wiced_hal_mia_pollHardware();
+
     HidEventKey event = {{HID_EVENT_KEY_STATE_CHANGE}};
 
     while (wiced_hal_keyscan_get_next_event(&event.keyEvent))

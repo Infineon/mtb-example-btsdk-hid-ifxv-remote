@@ -5,8 +5,7 @@
 /**
  * file app.c
  *
- * This is the HID over ISOC demo application for HID Device. This application should be used together with
- * isoc_hidh, HID Host, for the demo.
+ * This is the application for IFXV-Device. This application should be used tested with IFX-Voice supported host.
  *
  */
 #include "wiced_bt_types.h"
@@ -296,6 +295,9 @@ static uint32_t app_sleep_handler(wiced_sleep_poll_type_t type )
                 // we don't deep sleep until the params update successfully.
                 && (!link_is_connected() || link_params_update_is_expected())
 
+                // Not advertising
+                && (bt_get_advertising_mode()==BTM_BLE_ADVERT_OFF)
+
                 // a key is not down
                 && !key_active()
 
@@ -539,6 +541,9 @@ void app_link_up(wiced_bt_gatt_connection_status_t * p_status)
     WICED_BT_TRACE("Configure MTU with size %d",  MAX_MTU_SIZE);
     wiced_bt_gatt_configure_mtu(link_conn_id(), MAX_MTU_SIZE);
 
+    // enable ghost detection
+    kscan_enable_ghost_detection(TRUE);
+
     link_set_acl_conn_interval(wiced_bt_cfg_settings.ble_scan_cfg.conn_min_interval,
                                wiced_bt_cfg_settings.ble_scan_cfg.conn_max_interval,
                                wiced_bt_cfg_settings.ble_scan_cfg.conn_latency,
@@ -566,6 +571,9 @@ void app_link_down(wiced_bt_gatt_connection_status_t * p_status)
 
     hidd_set_conn_id(conn_id);
     hci_control_send_disconnect_evt( p_status->reason, p_status->conn_id );
+
+    // disable Ghost detection
+    kscan_enable_ghost_detection(FALSE);
 
     // if no more link, we turn off LED
     if (!conn_id)
@@ -661,11 +669,6 @@ wiced_result_t app_init(void)
 {
     WICED_BT_TRACE( "app_init" );
 
-#if ( defined(CYW20706A2) || defined(CYW20719B1) || defined(CYW20721B1) || defined(CYW43012C0) )
-    /* Initialize wiced app */
-    wiced_bt_app_init();
-#endif
-
     sds_init();
     link_init();
     hci_control_register_key_handler(app_hci_key_event);
@@ -694,6 +697,7 @@ wiced_result_t app_init(void)
 #else
     hci_control_set_capability(audio_capability(), 0, 0);
 #endif
+    hidd_enable_interrupt(TRUE);
 
     app_init_action();
     WICED_BT_TRACE("Free RAM bytes=%d bytes", wiced_memory_get_free_bytes());

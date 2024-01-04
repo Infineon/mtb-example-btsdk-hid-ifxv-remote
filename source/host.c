@@ -210,25 +210,28 @@ static uint8_t host_shift_down(uint8_t index)
  ********************************************************************/
 static void host_shift_up(uint8_t index)
 {
+#if HIDD_HOST_LIST_MAX > 1
     // make sure index is valid
     if (index < host.count)
     {
         // We are removing one host
         host.count--;
 
-#if HIDD_HOST_LIST_MAX > 1
         // Use memmove to ensure that overalpping areas are moved correctly
         memmove(&host.list[index],
                 &host.list[index+1],
                 HIDD_HOST_LIST_ELEMENT_SIZE*(host.count - index));
 
         if (host.count < HIDD_HOST_LIST_MAX)
-#endif
         {
             // Clear the freed element
             memset(&host.list[host.count], 0, HIDD_HOST_LIST_ELEMENT_SIZE);
         }
     }
+#else
+    host.count = 0;
+    memset(host.list, 0, HIDD_HOST_LIST_ELEMENT_SIZE);
+#endif
 }
 
 /********************************************************************

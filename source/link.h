@@ -20,9 +20,6 @@
 #define HID_LINK_CONNECTED    4
 #define HID_LINK_DISCONNECTED 1
 #define HID_LINK_MASK         0x7f
-#define NON_ISOC_ACL_CONN_INTERVAL 6
-#define NON_ISOC_ACL_LINK_SUPERVISION_TIMEOUT  200     // 2 sec timeout
-#define ISOC_ACL_LINK_SUPERVISION_TIMEOUT     1500     // 15 sec timeout
 
 #if BTSTACK_VER < 0x03000001
 #define wiced_bt_dev_get_acl_conn_handle(a,t) link.conn[0].connection_status.conn_id
