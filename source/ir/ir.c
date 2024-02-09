@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2023, Cypress Semiconductor Corporation (an Infineon company) or
+ * Copyright 2016-2024, Cypress Semiconductor Corporation (an Infineon company) or
  * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
@@ -50,6 +50,7 @@
 # define WICED_BT_TRACE(format,...)   wiced_printf(NULL, 0, (format"\n"), ##__VA_ARGS__)
 #endif
 
+// When IR_TRACE==3 for WICED boards, the USER button is used for IR button instead of audio button
 #if IR_TRACE==1
 # define APP_IR_TRACE        WICED_BT_TRACE
 # define APP_IR_TRACE2(...)
@@ -68,25 +69,26 @@
 #define IR_SPACE            0x0000    // bit15=0, bit 15 set to zero to indicate logic low in data duation
 #define APPIR_MAX_DURATION  0x7FFF    // bit[0:14] = duration
 
-#define IRTX_UNIT_US        25        // 1~25us
+#define IR_PERIOD(n)        (n*1000 / (26400))  // Adjust core clock, divide by 26.4
 
 #define APPIRTX_DATA_SIZE   128
 #define APP_CARRIER_FREQ    38000     // 38k Hz
-#define APP_IR_CYCLE        (107900/IRTX_UNIT_US) // 107.900 ms for the entire transaction
-#define APP_IR_ONE          (1680/IRTX_UNIT_US)   // 1.68 ms for one to stay low
-#define APP_IR_ZERO         (560/IRTX_UNIT_US)    // 560 us for zero to stay low
-#define APP_IR_SEPARATOR    (560/IRTX_UNIT_US)    // 560 us for the separator
-#define APP_LEAD_HIGH       (9000/IRTX_UNIT_US)   // Leading high for 9 ms
-#define APP_LEAD_LOW        (4500/IRTX_UNIT_US)   // Leading low for 4.5 ms
-#define APP_REPEAT_LOW      (2250/IRTX_UNIT_US)   // Repeat low for 2.25 ms
+#define APP_IR_CYCLE        IR_PERIOD(107900) // 108 ms for the entire transaction
+#define APP_IR_ONE          IR_PERIOD(1687)   // 1.6875 ms for one to stay low
+#define APP_IR_ZERO         IR_PERIOD(562)    // 562.5 us for zero to stay low
+#define APP_IR_SEPARATOR    IR_PERIOD(562)    // 562.5 us for the separator
+#define APP_LEAD_HIGH       IR_PERIOD(9000)   // Leading high for 9 ms
+#define APP_LEAD_LOW        IR_PERIOD(4500)   // Leading low for 4.5 ms
+#define APP_REPEAT_LOW      IR_PERIOD(2250)   // Repeat low for 2.25 ms
 
 #define APP_REPEAT_FOREVER  0xff
 #define APP_IR_POR_DELAY    50        // For POR (power on reset), wait 50 ms before hardware is ready to send IR
 
 #define IR_DUTY_CYCLE_33_PERCENT
-#ifdef IR_DUTY_CYCLE_33_PERCENT
+#define PWM HW_MIA_IR_CTL_EXTEND_MODULATE_SRC_PWM0
+#ifdef PWM
  #define ACLK ACLK1
- #define EXTENDED_SETTING      HW_MIA_IR_CTL_EXTEND_MODULATE_SRC_PWM0 | HW_MIA_IR_CTL_EXTEND_IR_CYCLE_T
+ #define EXTENDED_SETTING      (PWM | HW_MIA_IR_CTL_EXTEND_IR_CYCLE_T)
 #else
  #define ACLK ACLK0
  #define EXTENDED_SETTING      0
@@ -127,9 +129,15 @@ static void irtx_ClkSetting_init(void)
     ir.txClkSetting.clockSrcFreq = ACLK_FREQ_24_MHZ;
 
     ir.txClkSetting.extendedSettings = EXTENDED_SETTING;
+#ifdef IR_DUTY_CYCLE_33_PERCENT
+    // use 33% (1/3 high, 2/3 low)
     ir.txClkSetting.pwmDutyCycleHighCount = 1;
     ir.txClkSetting.pwmDutyCycleLowCount = 2;
-
+#else
+    // use 50% (1/2 high, 1/2 low)
+    ir.txClkSetting.pwmDutyCycleHighCount = 1;
+    ir.txClkSetting.pwmDutyCycleLowCount = 1;
+#endif
     ir.txClkSetting.invertOutput = FALSE;
     ir.txClkSetting.modulateFreq = APP_CARRIER_FREQ;
 
@@ -186,8 +194,8 @@ static void appirtx_initial_frame()
     appirtx_writebyte(~IR_ADDR);
     appirtx_writebyte(ir.code);
     appirtx_writebyte(~ir.code);
-    appirtx_data(TRUE, APP_IR_SEPARATOR);  // separator .56ms
-    appirtx_data(FALSE, APP_IR_CYCLE - ir.total_time_in_us);       // stays low until frame (107.9ms) ends
+    appirtx_data(TRUE, APP_IR_SEPARATOR);  // ending separator .5625 ms
+    appirtx_data(FALSE, APP_IR_CYCLE - ir.total_time_in_us);       // stays low until frame ends
 }
 
 /////////////////////////////////////////////////////////////////////////////////
@@ -202,7 +210,7 @@ static void appirtx_repeat_frame()
     appirtx_data(TRUE, APP_LEAD_HIGH);       // Leading high for 9 ms
     appirtx_data(FALSE, APP_REPEAT_LOW);     // Leading low for 2.25 ms
     appirtx_data(TRUE, APP_IR_SEPARATOR);    // separator .56ms
-    appirtx_data(FALSE, APP_IR_CYCLE - ir.total_time_in_us);       // stays low until frame (107.9ms) ends
+    appirtx_data(FALSE, APP_IR_CYCLE - ir.total_time_in_us);       // stays low until frame ends
 }
 
 ////////////////////////////////////////////////////////////////////////////////

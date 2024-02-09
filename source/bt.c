@@ -137,14 +137,6 @@ static wiced_result_t app_bt_management(wiced_bt_management_evt_t event, wiced_b
         case BTM_ENABLED_EVT:
             if ( p_event_data->enabled.status == WICED_BT_SUCCESS )
             {
-#if defined(TESTING_USING_HCI)
-                hci_control_enable_trace();
-#else
- #ifdef ENABLE_BT_SPY_LOG
-                /* Register HCI Trace callback */
-                wiced_bt_dev_register_hci_trace( (wiced_bt_hci_trace_cback_t*) cybt_debug_uart_send_hci_trace );
- #endif
-#endif
 #if BTSTACK_VER >= 0x03000001
                 wiced_bt_dev_read_local_addr_ext(&bt.dev);      // read extended device info
                 WICED_BT_TRACE("Local Addr: %B", dev_info()->local_addr);

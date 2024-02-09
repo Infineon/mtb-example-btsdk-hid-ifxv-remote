@@ -135,6 +135,21 @@ When the sleep mode is set to SLEEP_ALLOWED=2, SDS is enabled. When in SDS, the 
 # Application Settings
 See the application makefile for details about these make variables.
 
+- CUSTOM / TARGET
+    - Use those settings to build the intended target hardware platform.
+
+    ~~~
+    CUSTOM=1    Use custom bsp with 3x5 key matrix
+    CUSTOM=2    Use custom bsp with 3x6 key matrix
+    CUSTOM=0    The bsp will be specified by TARGET (Default)
+
+                Supported TARGET
+                    CYW920835M2EVB-01
+                    CYW920835REF-RCU-01 (Default)
+                    CYBLE-343072-EVAL-M2B
+                    CYBLE-333074-EVAL-M2B
+    ~~~
+
 - TESTING\_USING\_HCI
     - Since the application uses Client Control, this flag should be set at all times.
 
@@ -143,28 +158,28 @@ See the application makefile for details about these make variables.
    ~~~
    SLEEP_ALLOWED=0  Disable sleep function
    SLEEP_ALLOWED=1  Allow sleep without shutdown
-   SLEEP_ALLOWED=2  Allow sleep with shutdown
+   SLEEP_ALLOWED=2  Allow sleep with shutdown (Default)
    ~~~
 
 - OTA\_FW\_UPGRADE=n
 
    ~~~
    OTA_FW_UPGRADE=0  Disable OTA firmware upgrade feature
-   OTA_FW_UPGRADE=1  Build with OTA firmware upgrade feature
+   OTA_FW_UPGRADE=1  Build with OTA firmware upgrade feature (Default)
    ~~~
 
 - OTA\_SEC\_FW\_UPGRADE=n
 
    ~~~
-   OTA_SEC_FW_UPGRADE=0  Disable secure OTA firmware upgrade feature
+   OTA_SEC_FW_UPGRADE=0  Disable secure OTA firmware upgrade feature (Default)
    OTA_SEC_FW_UPGRADE=1  Use this option for secure OTA firmware upgrade, this flag is valid only when OTA_FW_UPGRADE is enabled. The ecdsa256_public_key content should be updated with the generated key in file ecdsa256_pub.c.
    ~~~
 
 - LED=n
 
    ~~~
-   LED=0            Disable LED functions
-   LED=1            Use LED for status indication
+   LED=0            Disable LED functions (Default, when CUSTOM is 1 or 2)
+   LED=1            Use LED for status indication (Default, when CUSTOM=0)
    ~~~
 
 - AUDIO=XXXX
@@ -176,15 +191,15 @@ See the application makefile for details about these make variables.
 - CODEC=XXXX
 
    ~~~
-   CODEC=            Leave empty to disable codec (Use PCM raw data)
-   CODEC=OPUS        Use OPUS CELT encoder
+   CODEC=            Leave empty to disable codec
+   CODEC=OPUS        Use OPUS CELT encoder (Default)
    CODEC=ADPCM       Use ADPCM encoder
    ~~~
 
 - PDM=n
 
    ~~~
-   PDM=0             Analog MIC
+   PDM=0             Analog MIC (Default)
    PDM=1             Digital MIC
    ~~~
 
@@ -192,34 +207,34 @@ See the application makefile for details about these make variables.
 
    ~~~
    AUTO_RECONNECT=0  Does nothing when link is down
-   AUTO_RECONNECT=1  Automatically reconnect when connection drops
+   AUTO_RECONNECT=1  Automatically reconnect when connection drops (Default)
    ~~~
 
 - START\_ADV\_ON\_POWERUP=n
 
    ~~~
    START_ADV_ON_POWERUP=0  Does nothing on power up
-   START_ADV_ON_POWERUP=1  Start advertising on power up. If paired it reconnect when power up
+   START_ADV_ON_POWERUP=1  Start advertising on power up. If paired it reconnect when power up (Default)
    ~~~
 
 - ENABLE\_CONNECTED\_ADV=n
 
    ~~~
    ENABLE_CONNECTED_ADV=0  Does not allow advertisement when link is connected
-   ENABLE_CONNECTED_ADV=1  Allow advertisement when link is connected
+   ENABLE_CONNECTED_ADV=1  Allow advertisement when link is connected (Default)
    ~~~
 
 - ENDLESS\_ADV=n
 
    ~~~
    ENDLESS_ADV=0  Advertisement expires in the time specified the configuration
-   ENDLESS_ADV=1  Advertisement does not expire
+   ENDLESS_ADV=1  Advertisement does not expire (Default)
    ~~~
 
 - LE\_LOCAL\_PRIVACY=n
 
    ~~~
-   LE_LOCAL_PRIVACY=0  Use public address
+   LE_LOCAL_PRIVACY=0  Use public address (Default)
    LE_LOCAL_PRIVACY=1  Use random private address
    ~~~
 
@@ -227,14 +242,14 @@ See the application makefile for details about these make variables.
 
    ~~~
    ENABLE_IR=0  Disable IR capability
-   ENABLE_IR=1  Enable IR capability
+   ENABLE_IR=1  Enable IR capability (Default)
    ~~~
 
 - ENABLE\_FINDME=n
 
    ~~~
    ENABLE_FINDME=0  Disable Findme capability
-   ENABLE_FINDME=1  Enable Findme capability
+   ENABLE_FINDME=1  Enable Findme capability (Default)
    ~~~
 
 ## BTSTACK version

@@ -22,6 +22,12 @@
 # define WICED_BT_TRACE(format,...)   wiced_printf(NULL, 0, (format"\n"), ##__VA_ARGS__)
 #endif
 
+#if APP_TRACE
+ #define APP_BT_TRACE      WICED_BT_TRACE
+#else
+ #define APP_BT_TRACE(...)
+#endif
+
 #define AUTO_RECONNECT_DELAY_WHEN_BOOT       5000
 #define AUTO_RECONNECT_DELAY_WHEN_DISCONNECT 500
 #ifdef ALLOW_SDS_IN_DISCOVERABLE
@@ -33,6 +39,14 @@
 #define SDS_ALLOWED_IN_MS_WHEN_WARM_BOOT     2000
 
 #include "wiced_bt_uuid.h"
+
+// key press status for combo key.
+typedef struct {
+    uint32_t keyStatus;
+    wiced_timer_t combokey_timer;
+} app_t;
+
+static app_t app = {0};
 
 /**********************************************************************************************
  * Report Table.
@@ -167,6 +181,7 @@ static void app_cccd_flags_changed()
     }
 
     WICED_BT_TRACE( "CCCD flags: %04x", nflags);
+    sds_allowed_in_ms(2000);   // Host is still active. Prolong sleep allowed time.
 }
 
 /******************************************************************************
@@ -182,6 +197,72 @@ static hidd_cfg_t hidd_cfg =
 };
 
 /////////////////////////////////////////////////////////////////////////////////
+/// This is a callback function from combo key time out
+/////////////////////////////////////////////////////////////////////////////////
+static void app_combo_key_timeout( uint32_t arg )
+{
+    WICED_BT_TRACE("Combo key timer expired");
+    switch (app.keyStatus) {
+    case CONNECT_COMBO:
+        led_off(RED_LED);
+        if (host_is_paired())
+        {
+            WICED_BT_TRACE("Removed pairing info");
+            app_remove_host_bonding();
+        }
+        WICED_BT_TRACE("Enter pairing");
+        bt_enter_pairing();
+        break;
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////
+/// Function Name: app_combo_key
+/////////////////////////////////////////////////////////////////////////////////
+/// Checks for if the current key is connet button.
+/// If it is, handle the action accordingly and return TRUE to indicate it is taken care of.
+/// Otherwise, it returns FALSE.
+///
+/// Parameter:
+///   keyCode -- the key to check.
+///   Down -- TRUE to indicate the key is pressed down.
+///
+/// Return:
+///   TRUE -- keyCode is connect button and it is handled.
+///   FALSE -- keyCode is not connect button.
+///
+////////////////////////////////////////////////////////////////////////////////
+static wiced_bool_t app_combo_key(uint8_t keyCode, wiced_bool_t down)
+{
+    if (keyCode < NUM_MAX_KEY)
+    {
+        if (down)
+        {
+            app.keyStatus |= (1<<keyCode);
+        }
+        else
+        {
+            app.keyStatus &= ~(1<<keyCode);
+        }
+
+        switch (app.keyStatus) {
+        case CONNECT_COMBO:
+            led_on(RED_LED);
+            WICED_BT_TRACE("Combo key timer started");
+            wiced_start_timer(&app.combokey_timer, CONNECT_COMBO_HOLD_TIME);
+            break;
+
+        default:
+            led_off(RED_LED);
+            WICED_BT_TRACE("Combo key timer stopped");
+            wiced_stop_timer(&app.combokey_timer);
+            break;
+        }
+    }
+    return FALSE;
+}
+
+/////////////////////////////////////////////////////////////////////////////////
 /// This is a callback function from keyscan when key action is detected
 /////////////////////////////////////////////////////////////////////////////////
 static void app_key_detected(uint8_t keyCode, uint8_t keyDown)
@@ -194,6 +275,7 @@ static void app_key_detected(uint8_t keyCode, uint8_t keyDown)
         break;
     default:
         WICED_BT_TRACE("kc:%d %c", keyCode, keyDown ? 'D':'U');
+        app_combo_key(keyCode, keyDown);        // check for combo key
         key_process_event(keyCode, keyDown);
     }
 }
@@ -247,6 +329,44 @@ static void app_hci_key_event(uint8_t keyCode, wiced_bool_t keyDown)
 }
 #endif
 
+#if SLEEP_ALLOWED > 1
+////////////////////////////////////////////////////////////////////////////////
+/// Function Name: app_shutdown_sleep_allowed
+////////////////////////////////////////////////////////////////////////////////
+/// Summary:
+///    Return TRUE if shutdown sleep is allowed
+///
+////////////////////////////////////////////////////////////////////////////////
+static wiced_bool_t app_shutdown_sleep_allowed()
+{
+    APP_BT_TRACE("a:%d, b:%d, c:%d, d:%d, e:%d, f:%d, g:%d, h:%d, i:%d, j:%d",
+                 !wiced_hidd_is_transport_detection_polling_on(), // a
+                 sds_is_allowed(), // b
+                 (!link_is_connected() || link_params_update_is_expected()), // c
+                 (bt_get_advertising_mode()==BTM_BLE_ADVERT_OFF), // d
+                 !key_active(), // e
+                 !button_active(), // f
+                 !audio_is_active(), // g
+                 !ir_is_active(), // h
+                 !findme_is_active(), // i
+                 !ota_is_active()); // j
+
+    return !wiced_hidd_is_transport_detection_polling_on() &&
+ #ifdef OTA_FIRMWARE_UPGRADE
+           !ota_fw_upgrade_initialized &&
+ #endif
+           sds_is_allowed() &&
+           (!link_is_connected() || link_params_update_is_expected()) &&
+           (bt_get_advertising_mode()==BTM_BLE_ADVERT_OFF) &&
+           !key_active() &&
+           !button_active() &&
+           !audio_is_active() &&
+           !ir_is_active() &&
+           !findme_is_active() &&
+           !ota_is_active() ;
+}
+#endif
+
 ////////////////////////////////////////////////////////////////////////////////
 /// Function Name: APP_sleep_handler
 ////////////////////////////////////////////////////////////////////////////////
@@ -275,44 +395,26 @@ static uint32_t app_sleep_handler(wiced_sleep_poll_type_t type )
     switch(type)
     {
         case WICED_SLEEP_POLL_TIME_TO_SLEEP:
-            ret = WICED_SLEEP_MAX_TIME_TO_SLEEP;
- #if SFI_DEEP_SLEEP
-            // In 20835, sfi CS may contains glitch that wakes up Flash result in high current. Apply workaround to put sfi into powerdown
-            if (pmu_attemptSleepState == 5 )
-            {
-                nvram_exit_deep_sleep(FALSE);
-                nvram_enter_deep_sleep();
-            }
+ #if SLEEP_ALLOWED > 1
+            if (app_shutdown_sleep_allowed())
  #endif
+            {
+                ret = WICED_SLEEP_MAX_TIME_TO_SLEEP;
+ #if SFI_DEEP_SLEEP
+                // In 20835, sfi CS may contains glitch that wakes up Flash result in high current. Apply workaround to put sfi into powerdown
+                if (pmu_attemptSleepState == 5)
+                {
+                    nvram_exit_deep_sleep(FALSE);
+                    nvram_enter_deep_sleep();
+                }
+ #endif
+            }
             break;
 
         case WICED_SLEEP_POLL_SLEEP_PERMISSION:
             ret = WICED_SLEEP_ALLOWED_WITHOUT_SHUTDOWN;
  #if SLEEP_ALLOWED > 1
-            if (!wiced_hidd_is_transport_detection_polling_on() && sds_is_allowed()
-
-                // If LE connection is established and expected link parameter update,
-                // we don't deep sleep until the params update successfully.
-                && (!link_is_connected() || link_params_update_is_expected())
-
-                // Not advertising
-                && (bt_get_advertising_mode()==BTM_BLE_ADVERT_OFF)
-
-                // a key is not down
-                && !key_active()
-
-                // audio is not active
-                && !audio_is_active()
-
-                // IR is not active
-                && !ir_is_active()
-
-                // Findme is not active
-                && !findme_is_active()
-
-                // OTA firmware upgrade is not active
-                && !ota_is_active()
-               )
+            if (app_shutdown_sleep_allowed())
             {
                 sds_save_data_to_aon();
                 ret = WICED_SLEEP_ALLOWED_WITH_SHUTDOWN;
@@ -345,7 +447,7 @@ wiced_sleep_config_t    sleep_config = {
 static void app_cold_boot()
 {
 #ifdef WICED_EVAL
-    if (button_down())
+    if (button_down(WICED_PLATFORM_BUTTON_1))
     {
         WICED_BT_TRACE( "User button pressed during start up -> removing pairing info" );
         if (host_is_paired())
@@ -544,10 +646,6 @@ void app_link_up(wiced_bt_gatt_connection_status_t * p_status)
     // enable ghost detection
     kscan_enable_ghost_detection(TRUE);
 
-    link_set_acl_conn_interval(wiced_bt_cfg_settings.ble_scan_cfg.conn_min_interval,
-                               wiced_bt_cfg_settings.ble_scan_cfg.conn_max_interval,
-                               wiced_bt_cfg_settings.ble_scan_cfg.conn_latency,
-                               wiced_bt_cfg_settings.ble_scan_cfg.conn_supervision_timeout);
     led_on(LINK_LED);
     hidd_set_conn_id(p_status->conn_id);
     hci_control_send_connect_evt( p_status->addr_type, p_status->bd_addr, p_status->conn_id, p_status->link_role );
@@ -555,7 +653,11 @@ void app_link_up(wiced_bt_gatt_connection_status_t * p_status)
     // if link is not bonded, give it 10 sec for bonding before allowing SDS
     if (!link_is_bonded())
     {
+#ifdef SKIP_CONNECT_PARAM_UPDATE_EVEN_IF_NO_PREFERED
+        sds_allowed_in_ms(DEFERRED_LINK_PARAM_UPDATE_TIME + 1000); // One second after link parameter update
+#else
         sds_allowed_in_ms(10000); // no SDS for 10 sec.
+#endif
     }
 }
 
@@ -570,7 +672,6 @@ void app_link_down(wiced_bt_gatt_connection_status_t * p_status)
     uint16_t conn_id = link_conn_id();  // if we have multiple links, the link_conn_id() can return the secondary conn_id.
 
     hidd_set_conn_id(conn_id);
-    hci_control_send_disconnect_evt( p_status->reason, p_status->conn_id );
 
     // disable Ghost detection
     kscan_enable_ghost_detection(FALSE);
@@ -591,7 +692,12 @@ void app_link_down(wiced_bt_gatt_connection_status_t * p_status)
     }
 
 #ifdef AUTO_RECONNECT
-    bt_delayed_reconnect(AUTO_RECONNECT_DELAY_WHEN_DISCONNECT);
+ #ifdef OTA_FIRMWARE_UPGRADE
+    if (!ota_fw_upgrade_initialized)
+ #endif
+    {
+        bt_delayed_reconnect(AUTO_RECONNECT_DELAY_WHEN_DISCONNECT);
+    }
 #endif
 }
 
@@ -669,6 +775,9 @@ wiced_result_t app_init(void)
 {
     WICED_BT_TRACE( "app_init" );
 
+    // init combo key timer
+    wiced_init_timer( &app.combokey_timer, app_combo_key_timeout, 0, WICED_SECONDS_TIMER );
+
     sds_init();
     link_init();
     hci_control_register_key_handler(app_hci_key_event);
@@ -716,11 +825,6 @@ void application_start( void )
 {
     // Initialize LED/UART for debug
     wiced_set_debug_uart(WICED_ROUTE_DEBUG_TO_PUART);
-#ifdef ENABLE_BT_SPY_LOG
-    WICED_BT_TRACE("Routing debug msg to WICED_UART, open ClientControl/BtSpy");
-    // Initialize LED/UART for debug
-    wiced_set_debug_uart(WICED_ROUTE_DEBUG_TO_WICED_UART);
-#endif
     led_init(led_count, platform_led);
 
     bt_init();                                // WICED_BT_TRACE starts to work after bt_init() for 20829
@@ -835,6 +939,12 @@ void application_start( void )
     WICED_BT_TRACE("LE_LOCAL_PRIVACY_SUPPORT");
 #endif
 
+    hci_control_enable_trace();
+#ifdef ENABLE_BT_SPY_LOG
+    WICED_BT_TRACE("Routing debug msg to WICED_UART, open ClientControl/BtSpy");
+    // Initialize LED/UART for debug
+    wiced_set_debug_uart(WICED_ROUTE_DEBUG_TO_WICED_UART);
+#endif // ENABLE_BT_SPY_LOG
 }
 
 /* end of file */

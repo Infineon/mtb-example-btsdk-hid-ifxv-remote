@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2023, Cypress Semiconductor Corporation (an Infineon company) or
+ * Copyright 2016-2024, Cypress Semiconductor Corporation (an Infineon company) or
  * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
@@ -102,13 +102,13 @@ typedef PACKED struct
     uint8_t    bitMappedKeys[KEY_NUM_BYTES_IN_BIT_MAPPED_REPORT];
 }KeyboardBitMappedReport;
 
-/// Bit mapped key report structure
+/// User defined key report structure
 typedef PACKED struct
 {
     /// Set to the value specified in the config record.
     uint8_t    reportID;
 
-    /// Bit mapped keys
+    /// User defined keys
     uint8_t    userKeys[KEY_NUM_BYTES_IN_USER_DEFINED_REPORT];
 }KeyboardUserDefinedReport;
 

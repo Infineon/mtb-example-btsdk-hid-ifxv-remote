@@ -252,7 +252,7 @@ wiced_result_t sds_timer_stop(sds_timer_t *p_timer)
 /////////////////////////////////////////////////////////////////////////////////
 static void allow_sds_timer_cb( uint32_t arg )
 {
-    APP_SDS_TRACE("SDS Allowed");
+    APP_SDS_TRACE("timer cb: SDS Allowed");
     sds.allow_sds = TRUE;
 }
 
@@ -331,7 +331,7 @@ void sds_restore_data_from_aon()
 
     if (link_is_connected())
     {
-        hidd_set_conn_id(link_conn_id());
+        hidd_set_conn_id( link_conn_id() );
     }
 }
 

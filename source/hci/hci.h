@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2023, Cypress Semiconductor Corporation (an Infineon company) or
+ * Copyright 2016-2024, Cypress Semiconductor Corporation (an Infineon company) or
  * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
@@ -82,7 +82,7 @@ uint32_t hci_dev_handle_command( uint8_t * p_data, uint32_t length );
  #define hci_control_send_data( code, buf, len )
  #define hci_control_register_key_handler( handler )
  #define hci_control_send_audio_data_req()
- #ifdef HCI_TRACES_ENABLED
+ #ifdef HCI_TRACES_DUMP_TO_PUART
   void hci_control_enable_trace();
  #else
   #define hci_control_enable_trace()

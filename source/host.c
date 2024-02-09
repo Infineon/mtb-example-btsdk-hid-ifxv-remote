@@ -31,13 +31,15 @@
 # define APP_HOST_TRACE2(...)
 #endif
 
-#define COMMIT_DELAY 1000     // 1 sec to commit
+#define COMMIT_DELAY 100     // 100 msec to commit
 
 #define HIDD_HOST_LIST_ELEMENT_SIZE sizeof(host_info_t)
 #define HIDD_HOST_LIST_SIZE (HIDD_HOST_LIST_MAX * HIDD_HOST_LIST_ELEMENT_SIZE)
 
 #define HOST_INFO_NOT_FOUND    0xff
 #define HOST_INFO_INDEX_TOP    0
+
+#define host_nvram_update_pending() wiced_is_timer_in_use(&host.commitTimer)
 
 #pragma pack(1)
 
@@ -126,7 +128,7 @@ static void host_commit_timer_cb( TIMER_PARAM_TYPE arg )
  *******************************************************************/
 static void host_update_to_nvram(uint32_t delay)
 {
-    if (wiced_is_timer_in_use(&host.commitTimer))
+    if (host_nvram_update_pending())
     {
         wiced_stop_timer(&host.commitTimer);
     }
@@ -644,5 +646,20 @@ wiced_bt_transport_t host_transport()
 {
     return host_is_paired() ? host.list[0].transport : 0;
 }
+
+/********************************************************************
+ * Function Name: host_nvram_commit
+ ********************************************************************
+ * Summary:
+ *  If there is any pending data, force to commit data immediately.
+ *******************************************************************/
+void host_nvram_commit()
+{
+    if (host_nvram_update_pending())
+    {
+        host_update_to_nvram(0);
+    }
+}
+
 
 /* end of file */

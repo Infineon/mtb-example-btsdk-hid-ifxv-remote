@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2023, Cypress Semiconductor Corporation (an Infineon company) or
+ * Copyright 2016-2024, Cypress Semiconductor Corporation (an Infineon company) or
  * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
@@ -109,8 +109,9 @@ enum KeyType
 *****************************************************************************/
 KbKeyConfig kbKeyConfig[] =
 {
-#if CUSTOM_KEY_MATRIX == 1
-    // Matrix 5x3 --> Col:5(0..4) Row:3(0..2)
+#if CUSTOM_KEY_MATRIX >= 1
+    // CUSTOM_KEY_MATRIX==1: Matrix 5x3 --> Col:5(0..4) Row:3(0..2)
+    // CUSTOM_KEY_MATRIX==2: Matrix 6x3 --> Col:5(0..5) Row:3(0..2)
 
     // Column 0:  order is row0 -> row2
     {KEY_TYPE_BIT_MAPPED,   BITMAP_AC_SEARCH},      //#0, Voice
@@ -134,9 +135,15 @@ KbKeyConfig kbKeyConfig[] =
 
     // Column 4: order is row0 -> row2
     {KEY_TYPE_BIT_MAPPED,   BITMAP_MENU},           //#12, Menu
-    {KEY_TYPE_BIT_MAPPED,   BITMAP_AL_AUDIO_PLAYER},//#13, Menu
-    {KEY_TYPE_NONE,         0},                     //#14, n/c
+    {KEY_TYPE_BIT_MAPPED,   BITMAP_AL_AUDIO_PLAYER},//#13, Music
+    {KEY_TYPE_USER_0,       KEY_HULU},              //#14, n/c or Hulu
 
+    // Column 5: order is row0 -> row2
+ #if CUSTOM_KEY_MATRIX == 2
+    {KEY_TYPE_USER_0,       KEY_NETFLIX},           //#15, Netflex
+    {KEY_TYPE_USER_0,       KEY_MAX},               //#16, MAX
+    {KEY_TYPE_USER_0,       KEY_DISNEY},            //#17, Disney
+ #endif // CUSTOM_KEY_MATRIX == 2
 #else
     // Matrix 7x3 --> Col:7(0..6) Row:3(0..2)
 
@@ -370,7 +377,25 @@ static void KeyRpt_bitRptProcEvtKey(uint8_t set, uint8_t bitPos)
  *******************************************************************************/
 static void KeyRpt_procEvtUserDefinedKey(uint8_t down, uint8_t translationCode)
 {
-    // User define key not implemented
+#if CUSTOM_KEY_MATRIX == 2
+    switch (translationCode) {
+    case KEY_HULU:
+        WICED_BT_TRACE("Hulu key %s", down ? "down" : "up");
+        break;
+    case KEY_NETFLIX:
+        WICED_BT_TRACE("Netflix key %s", down ? "down" : "up");
+        break;
+    case KEY_MAX:
+        WICED_BT_TRACE("MAX key %s", down ? "down" : "up");
+        break;
+    case KEY_DISNEY:
+        WICED_BT_TRACE("Disney key %s", down ? "down" : "up");
+        break;
+    default:
+        WICED_BT_TRACE("Unknown custom key %d %s", translationCode, down ? "down" : "up");
+        break;
+    }
+#endif
 }
 
 /*******************************************************************************

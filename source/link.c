@@ -18,16 +18,11 @@
 # define WICED_BT_TRACE(format,...)   wiced_printf(NULL, 0, (format"\n"), ##__VA_ARGS__)
 #endif
 
-#define DEFERRED_LINK_PARAM_UPDATE_TIME 20  // differ link parameter update for 20 sec after link is up
-
 /******************************************************************************
  *  local data
  ******************************************************************************/
 
 link_t link = {0};
-#ifdef SKIP_CONNECT_PARAM_UPDATE_EVEN_IF_NO_PREFERED
-static wiced_timer_t  deferred_link_update_timer;
-#endif
 
 /******************************************************************************
  *  Private functions
@@ -397,9 +392,12 @@ wiced_bt_gatt_status_t link_up( wiced_bt_gatt_connection_status_t * p_status )
     // notify application the link is up
     app_link_up(p_status);
 
+    // Check if we need link parameter update
 #ifdef SKIP_CONNECT_PARAM_UPDATE_EVEN_IF_NO_PREFERED
     WICED_BT_TRACE("Defer link parameter update for %d second", DEFERRED_LINK_PARAM_UPDATE_TIME);
     wiced_start_timer(&link.deferred_link_update_timer, DEFERRED_LINK_PARAM_UPDATE_TIME);
+#else
+    link_check_conn_parameter();
 #endif
 
     return WICED_BT_GATT_SUCCESS;

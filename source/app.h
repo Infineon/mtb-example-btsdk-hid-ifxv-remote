@@ -41,15 +41,24 @@
 
 #define CONNECT_KEY_INDEX  0
 
-#if CUSTOM_KEY_MATRIX == 1
+#if CUSTOM_KEY_MATRIX >= 1
  #define NUM_KEYSCAN_ROWS   3  // Num of Rows in keyscan matrix
- #define NUM_KEYSCAN_COLS   5  // Num of Cols in keyscan matrix
+ #if CUSTOM_KEY_MATRIX == 1
+  #define NUM_KEYSCAN_COLS   5  // Num of Cols in keyscan matrix
+ #else
+  #define NUM_KEYSCAN_COLS   6  // Num of Cols in keyscan matrix
+ #endif
 
  #define AUDIO_KEY_INDEX    0
  #define HOME_KEY_INDEX     9
  #define BACK_KEY_INDEX     6
  #define IR_KEY_INDEX       14 // Doesn't exists, use NC key index
  #define MUTE_KEY_INDEX     8
+
+ #define KEY_HULU           1
+ #define KEY_NETFLIX        2
+ #define KEY_MAX            3
+ #define KEY_DISNEY         4
 #else
  #define NUM_KEYSCAN_ROWS   3  // Num of Rows in keyscan matrix
  #define NUM_KEYSCAN_COLS   7  // Num of Cols in keyscan matrix
@@ -67,11 +76,7 @@
 #define CONNECT_COMBO       (1<<CONNECT_INDEX)   // CONNECT COMBO BITS
 #define CONNECT_COMBO_HOLD_TIME 10               // Hold for 10 sec.
 
-#ifdef SUPPORT_KEYSCAN
- #define key_active() keyscanActive()
-#else
- #define key_active() button_down()
-#endif
+#define key_active() keyscanActive()
 
 /*******************************************************************************
  * macros

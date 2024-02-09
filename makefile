@@ -1,5 +1,5 @@
 #
-# Copyright 2016-2023, Cypress Semiconductor Corporation (an Infineon company) or
+# Copyright 2016-2024, Cypress Semiconductor Corporation (an Infineon company) or
 # an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
 #
 # This software, including source code, documentation and related
@@ -65,6 +65,31 @@ ifeq ($(filter $(TARGET),$(SUPPORTED_TARGETS)),)
  $(error TARGET $(TARGET) is not supported for this application. Edit SUPPORTED_TARGETS in the code example makefile to add new BSPs)
 endif
 
+# When CUSTOM is defined as 1, the key matrix will be custom 3x5
+# When CUSTOM is defined as 2, the key matrix will be custom 3x6
+# otherwise, the bsp specified in TARGET will be used.
+CUSTOM?=0
+ifeq ($(CUSTOM),1)
+ CY_APP_DEFINES += -DCUSTOM_KEY_MATRIX=1 -DSUPPORT_BUTTON -DSUPPORT_KEYSCAN
+ COMPONENTS += bsp_custom_design_3x5
+ $(info Building Custom BSP with key matrix 3x5)
+else
+ ifeq ($(CUSTOM),2)
+  CY_APP_DEFINES += -DCUSTOM_KEY_MATRIX=2 -DSUPPORT_BUTTON -DSUPPORT_KEYSCAN
+  COMPONENTS += bsp_custom_design_3x6
+  $(info Building custom bsp with key matrix 3x6)
+ else
+  COMPONENTS += bsp_design_modus
+  ifeq ($(filter $(TARGET), CYW920835REF-RCU-01),)
+   CY_APP_DEFINES += -DWICED_EVAL -DSUPPORT_BUTTON
+   $(info Building $(TARGET) bsp)
+  else
+   $(info Building $(TARGET) bsp with key matrix 3x7)
+   CY_APP_DEFINES += -DSUPPORT_KEYSCAN
+  endif
+ endif
+endif
+
 #
 # Advanced Configuration
 #
@@ -85,7 +110,6 @@ FEATURES=
 #
 # Define basic library COMPONENTS
 #
-COMPONENTS += bsp_design_modus
 COMPONENTS += hidd_lib gatt_utils_lib
 
 #######################################################################################
@@ -123,7 +147,11 @@ SLEEP_ALLOWED?=2
 #  LED=0  Disable LED functions (Good for power consumption measurement)
 #  LED=1  Use LED for status indication
 #
-LED?=1
+ifeq ($(CUSTOM),0)
+ LED?=1
+else
+ LED?=0
+endif
 
 ####################################################
 # Use OTA_FW_UPGRADE=1 to enable Over-the-air firmware upgrade functionality
@@ -151,12 +179,17 @@ OTA_SEC_FW_UPGRADE?=0
 #
 # PDM=x
 #    - Use this option to enable/disable digital microphone (PDM=1/0). The AUDIO option must be enabled for this option to take effect.
-#    - This option is invalid for CYW920835REF-RCU-01 BSP as it does not PDM hardware. In CYW920835M2EVB-01 platform,
+#    - This option is invalid for CYW920835REF-RCU-01 BSP as it does not have PDM hardware. In CYW920835M2EVB-01 platform,
 #      since the GPIO pins are shared with LEDs, make sure SW4 is switched to DMIC and the LED is disabled for the complier option.
 #
 AUDIO?=IFXV
 CODEC?=OPUS
 PDM?=0
+
+ifeq ($(AUDIO),ATV)
+ # CODEC=ADPCM
+ $(error Google Voice is not supported)
+endif
 
 ####################################################
 # Link related flags
@@ -205,7 +238,7 @@ ENABLE_FINDME?=1
 #
 # App defines
 #
-CY_APP_DEFINES = \
+CY_APP_DEFINES += \
   -DSUPPORT_KEY_REPORT \
   -DSWITCH_DIRECT_TO_UNDIRECT_ADV \
   -DSFI_DEEP_SLEEP \
@@ -221,15 +254,6 @@ ifeq ($(TESTING_USING_HCI),1)
  ifeq ($(ENABLE_BT_SPY),1)
   CY_APP_DEFINES += -DENABLE_BT_SPY_LOG
  endif
-endif
-
-ifeq ($(filter $(TARGET), CYW920835REF-RCU-01),)
- CY_APP_DEFINES += -DWICED_EVAL
-else
- CY_APP_DEFINES += -DSUPPORT_KEYSCAN
- # When DCUSTOM_KEY_MATRIX is not defined or defined as 0, the key matrix is 3x7 for CYW920835REF-RCU-01 hardware.
- # When defined as 1, the key matrix will be using custom 3x5
-# CY_APP_DEFINES += -DCUSTOM_KEY_MATRIX=1
 endif
 
 ifeq ($(OTA_FW_UPGRADE),1)
@@ -284,7 +308,6 @@ else
    COMPONENTS += ifxv
   else
    COMPONENTS += atv
-   $(error Google Voice is not implemeneted for this release)
   endif
 
   ifeq ($(CODEC),ADPCM)
@@ -357,11 +380,12 @@ TRACE_AUDIO?=0
 TRACE_MIC?=0
 TRACE_CODEC?=0
 TRACE_PROTOCOL?=0
+TRACE_APP=0
 
 DEFINES += BT_TRACE=$(TRACE_BT) GATT_TRACE=$(TRACE_GATT) HIDD_TRACE=$(TRACE_HIDD) HCI_TRACE=$(TRACE_HCI)
 DEFINES += LED_TRACE=$(TRACE_LED) KEY_TRACE=$(TRACE_KEY) NVRAM_TRACE=$(TRACE_NVRAM) HOST_TRACE=$(TRACE_HOST)
 DEFINES += AUDIO_TRACE=$(TRACE_AUDIO) MIC_TRACE=$(TRACE_MIC) CODEC_TRACE=$(TRACE_CODEC) PROTOCOL_TRACE=$(TRACE_PROTOCOL)
-DEFINES += IR_TRACE=$(TRACE_IR) FINDME_TRACE=$(TRACE_FINDME) SDS_TRACE=$(TRACE_SDS)
+DEFINES += IR_TRACE=$(TRACE_IR) FINDME_TRACE=$(TRACE_FINDME) SDS_TRACE=$(TRACE_SDS) APP_TRACE=$(TRACE_APP)
 
 ################################################################################
 # Paths

@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2023, Cypress Semiconductor Corporation (an Infineon company) or
+ * Copyright 2016-2024, Cypress Semiconductor Corporation (an Infineon company) or
  * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
@@ -120,7 +120,7 @@ void kscan_init(uint8_t row, uint8_t col, key_detected_callback_t * cb)
     //save applicatino callback function pointer
     ks.appCb = cb;
 
-    APP_KEY_TRACE("keyscan %dx%d", row, col);
+    WICED_BT_TRACE("keyscan %dx%d", row, col);
     //keyscan initialize
     wiced_hal_keyscan_configure(row, col);
     wiced_hal_keyscan_init();

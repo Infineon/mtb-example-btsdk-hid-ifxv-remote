@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2023, Cypress Semiconductor Corporation (an Infineon company) or
+ * Copyright 2016-2024, Cypress Semiconductor Corporation (an Infineon company) or
  * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
@@ -40,13 +40,16 @@
 #define BUTTON_H__
 
 // Button is supported only if the device is WICED_EVAL board
-#ifdef WICED_EVAL
+#ifdef SUPPORT_BUTTON
  void button_init();
- wiced_bool_t button_down();
+ wiced_bool_t button_down(int index);
  void button_check_boot_action();
+ wiced_bool_t button_active();
 #else
  #define button_init()
  #define button_check_boot_action()
-#endif
+ #define button_active() FALSE
+ #define button_down(n) FALSE
+#endif // SUPPORT_BUTTON
 
 #endif // BUTTON_H__

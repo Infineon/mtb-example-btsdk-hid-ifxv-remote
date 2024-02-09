@@ -14,6 +14,7 @@
 
 #include "wiced_bt_gatt.h"
 #include "wiced_bt_ble.h"
+#include "wiced_timer.h"
 
 #define BT_TRANSPORT_NONE   0
 
@@ -26,6 +27,9 @@
 #endif
 
 #define MAX_CONN            2
+
+#define DEFERRED_LINK_PARAM_UPDATE_TIME 20  // differ link parameter update for 20 sec after link is up
+
 /******************************************************************************
  *  typedef
  ******************************************************************************/
@@ -51,6 +55,9 @@ typedef struct
 {
     link_state_t   conn[MAX_CONN];
     link_state_t * active;
+#ifdef SKIP_CONNECT_PARAM_UPDATE_EVEN_IF_NO_PREFERED
+    wiced_timer_t  deferred_link_update_timer;
+#endif
 } link_t;
 
 extern link_t link;

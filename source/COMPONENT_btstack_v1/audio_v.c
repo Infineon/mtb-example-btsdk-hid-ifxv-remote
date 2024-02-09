@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2023, Cypress Semiconductor Corporation (an Infineon company) or
+ * Copyright 2016-2024, Cypress Semiconductor Corporation (an Infineon company) or
  * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
@@ -152,11 +152,14 @@ void mic_assign_mic_pdm_pins(uint8_t clk, uint8_t data)
 /// \return WICED_TRUE/WICED_FALSE
 void mic_assign_mic_en_pin(uint8_t gpio, wiced_bool_t disable_level)
 {
+    uint16_t cfg = (disable_level ? GPIO_PULL_UP : GPIO_PULL_DOWN) | GPIO_OUTPUT_ENABLE;
+
     pin_en_mic.enabled = TRUE;
     pin_en_mic.disable_level = disable_level;
     pin_en_mic.gpio = gpio;
-    wiced_hal_gpio_configure_pin(gpio, (disable_level ? GPIO_PULL_UP : GPIO_PULL_DOWN) | GPIO_OUTPUT_ENABLE, disable_level);
-    wiced_hal_gpio_slimboot_reenforce_cfg(gpio, GPIO_OUTPUT_ENABLE);
+
+    wiced_hal_gpio_configure_pin(gpio, cfg, disable_level);
+    wiced_hal_gpio_slimboot_reenforce_cfg(gpio, cfg);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

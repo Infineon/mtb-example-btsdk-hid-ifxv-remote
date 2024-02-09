@@ -205,5 +205,13 @@ uint8_t host_addr_type();
  ***********************************************************/
 wiced_bt_transport_t host_transport();
 
+/********************************************************************
+ * Function Name: host_nvram_commit
+ ********************************************************************
+ * Summary:
+ *  If there is any pending data, force to commit data immediately.
+ *******************************************************************/
+void host_nvram_commit();
+
 #endif // HOST_H__
 /* end of file */

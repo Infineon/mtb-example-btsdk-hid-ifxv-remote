@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2023, Cypress Semiconductor Corporation (an Infineon company) or
+ * Copyright 2016-2024, Cypress Semiconductor Corporation (an Infineon company) or
  * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
@@ -625,7 +625,7 @@ void hci_control_enable_trace()
 
 void hci_control_init()
 {
-    APP_HCI_TRACE("TESTING_USING_HCI");
+    APP_HCI_TRACE("hci control init");
     wiced_transport_init( &transport_cfg );
     hci_control_enable_trace();
     wiced_init_timer( &hci.timer, hci_timer_cb, 0, WICED_MILLI_SECONDS_TIMER );
@@ -637,7 +637,7 @@ void hci_control_register_key_handler(hidd_app_hci_key_callback_t key_handler)
 }
 
 #else
- #ifdef HCI_TRACES_ENABLED
+ #ifdef HCI_TRACES_DUMP_TO_PUART
 //
 // The HCI commands are dumped PUART in byte array.
 // User the tool TraceToSpy.exe to read the dump file to btspy to decode the HCI messages
