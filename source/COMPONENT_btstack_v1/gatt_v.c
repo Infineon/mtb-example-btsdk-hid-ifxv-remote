@@ -1,34 +1,31 @@
 /*
- * Copyright 2016-2024, Cypress Semiconductor Corporation (an Infineon company) or
- * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
+ * (c) 2016-2025, Infineon Technologies AG, or an affiliate of Infineon
+ * Technologies AG. All rights reserved.
+ * This software, associated documentation and materials ("Software") is
+ * owned by Infineon Technologies AG or one of its affiliates ("Infineon")
+ * and is protected by and subject to worldwide patent protection, worldwide
+ * copyright laws, and international treaty provisions. Therefore, you may use
+ * this Software only as provided in the license agreement accompanying the
+ * software package from which you obtained this Software. If no license
+ * agreement applies, then any use, reproduction, modification, translation, or
+ * compilation of this Software is prohibited without the express written
+ * permission of Infineon.
  *
- * This software, including source code, documentation and related
- * materials ("Software") is owned by Cypress Semiconductor Corporation
- * or one of its affiliates ("Cypress") and is protected by and subject to
- * worldwide patent protection (United States and foreign),
- * United States copyright laws and international treaty provisions.
- * Therefore, you may use this Software only as provided in the license
- * agreement accompanying the software package from which you
- * obtained this Software ("EULA").
- * If no EULA applies, Cypress hereby grants you a personal, non-exclusive,
- * non-transferable license to copy, modify, and compile the Software
- * source code solely for use in connection with Cypress's
- * integrated circuit products.  Any reproduction, modification, translation,
- * compilation, or representation of this Software except as specified
- * above is prohibited without the express written permission of Cypress.
- *
- * Disclaimer: THIS SOFTWARE IS PROVIDED AS-IS, WITH NO WARRANTY OF ANY KIND,
- * EXPRESS OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, NONINFRINGEMENT, IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. Cypress
- * reserves the right to make changes to the Software without notice. Cypress
- * does not assume any liability arising out of the application or use of the
- * Software or any product or circuit described in the Software. Cypress does
- * not authorize its products for use in any products where a malfunction or
- * failure of the Cypress product may reasonably be expected to result in
- * significant property damage, injury or death ("High Risk Product"). By
- * including Cypress's product in a High Risk Product, the manufacturer
- * of such system or application assumes all risk of such use and in doing
- * so agrees to indemnify Cypress against all liability.
+ * Disclaimer: UNLESS OTHERWISE EXPRESSLY AGREED WITH INFINEON, THIS SOFTWARE
+ * IS PROVIDED AS-IS, WITH NO WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+ * INCLUDING, BUT NOT LIMITED TO, ALL WARRANTIES OF NON-INFRINGEMENT OF
+ * THIRD-PARTY RIGHTS AND IMPLIED WARRANTIES SUCH AS WARRANTIES OF FITNESS FOR A
+ * SPECIFIC USE/PURPOSE OR MERCHANTABILITY.
+ * Infineon reserves the right to make changes to the Software without notice.
+ * You are responsible for properly designing, programming, and testing the
+ * functionality and safety of your intended application of the Software, as
+ * well as complying with any legal requirements related to its use. Infineon
+ * does not guarantee that the Software will be free from intrusion, data theft
+ * or loss, or other breaches ("Security Breaches"), and Infineon shall have
+ * no liability arising out of any Security Breaches. Unless otherwise
+ * explicitly approved by Infineon, the Software may not be used in any
+ * application where a failure of the Product or any consequences of the use
+ * thereof can reasonably be expected to result in personal injury.
  */
 
 /** @file
@@ -67,7 +64,7 @@
 wiced_bt_gatt_status_t gatt_v_callback( wiced_bt_gatt_evt_t event, wiced_bt_gatt_event_data_t * p_data)
 {
     APP_GATT_TRACE("GATT: unhandled event %d !!!", event);
-    return WICED_BT_GATT_SUCCESS;
+    return WICED_BT_GATT_REQ_NOT_SUPPORTED;
 }
 
 /*
@@ -155,7 +152,7 @@ wiced_bt_gatt_status_t gatt_req_read_default_handler( uint16_t conn_id, wiced_bt
  */
 wiced_bt_gatt_status_t gatt_req_cb( wiced_bt_gatt_attribute_request_t *p_data )
 {
-    wiced_bt_gatt_status_t result = WICED_BT_GATT_SUCCESS;
+    wiced_bt_gatt_status_t result = WICED_BT_GATT_REQ_NOT_SUPPORTED;
 
     switch ( p_data->request_type )
     {
@@ -164,8 +161,10 @@ wiced_bt_gatt_status_t gatt_req_cb( wiced_bt_gatt_attribute_request_t *p_data )
             result = app_gatt_read_req_handler(p_data->conn_id, &(p_data->data.read_req));
             break;
 
-        case GATTS_REQ_TYPE_WRITE:
         case GATTS_REQ_TYPE_PREP_WRITE:
+            break;
+
+        case GATTS_REQ_TYPE_WRITE:
             APP_GATT_TRACE2("Req PREP_WRITE or WRITE handle:%04x len:%d -- %A", p_data->data.write_req.handle, p_data->data.write_req.val_len, p_data->data.write_req.p_val, p_data->data.write_req.val_len);
             result = app_gatt_write_handler(p_data->conn_id, &(p_data->data.write_req));
             break;

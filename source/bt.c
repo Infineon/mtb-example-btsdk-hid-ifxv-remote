@@ -215,7 +215,7 @@ static wiced_result_t app_bt_management(wiced_bt_management_evt_t event, wiced_b
         case  BTM_PAIRED_DEVICE_LINK_KEYS_REQUEST_EVT:
             {
                 wiced_bt_device_link_keys_t * link_key = host_get_link_key(p_event_data->paired_device_link_keys_request.bd_addr);
-                if ((link_key != NULL) && (&p_event_data->paired_device_link_keys_request != NULL))
+                if (link_key != NULL)
                 {
                     memcpy(&p_event_data->paired_device_link_keys_request, link_key, sizeof(wiced_bt_device_link_keys_t));
                     link_set_bonded(TRUE); // We have the link key, it is a bonded device
